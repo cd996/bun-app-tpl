@@ -1,7 +1,15 @@
 {
   "name": "@app/web",
-  "private": true,
   "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "description": "React 19 SPA with TanStack Router, Tailwind v4 and dual EN/ZH i18n.",
+  "homepage": "https://github.com/zzci",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zzci/bun-app-tpl.git",
+    "directory": "apps/web"
+  },
   "scripts": {
     "dev": "nsl run --name \"${APP_NAME:-app}\" vite",
     "build": "vite build",
@@ -47,6 +55,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@app/tsconfig": "workspace:*",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/router-plugin": "^1.167.35",
     "@types/prismjs": "^1.26.6",
@@ -54,8 +63,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "tailwindcss": "^4.3.0",
-    "typescript": "^6.0.3",
+    "typescript": "catalog:",
     "vite": "^8.0.11",
-    "vitest": "^4.1.5"
+    "vitest": "catalog:"
   }
 }

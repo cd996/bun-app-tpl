@@ -7,7 +7,7 @@ COPY package.json bun.lock bunfig.toml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
-COPY packages/config/package.json packages/config/
+COPY packages/tsconfig/package.json packages/tsconfig/
 RUN bun install --frozen-lockfile
 
 # Git is needed by compile.ts to embed commit hash

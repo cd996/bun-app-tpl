@@ -16,6 +16,7 @@ const all = args.has("--all");
 const targets = [
   // Build output
   "dist",
+  "packages/shared/dist",
   // Vite cache
   "apps/web/.vite",
   "apps/web/.tanstack",
@@ -35,7 +36,7 @@ const allTargets = [
   "apps/api/node_modules",
   "apps/web/node_modules",
   "packages/shared/node_modules",
-  "packages/config/node_modules",
+  "packages/tsconfig/node_modules",
   // Test residue: per-test attachment trees and the e2e cache (run dirs +
   // dex binary + JUnit reports).
   "data/uploads",

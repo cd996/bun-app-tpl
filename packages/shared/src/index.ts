@@ -5,4 +5,4 @@ export interface ApiResponse<T> {
   readonly meta?: { readonly total: number; readonly page: number; readonly limit: number };
 }
 
-export { bytesToHex, deriveKeyPairFromPassword, eciesDecrypt, eciesEncrypt, generateKeyPair, generateSalt, hexToBytes } from "./ecies";
+export * from "./ecies";

@@ -1,3 +1,4 @@
+import { describe, expect, test } from "vitest";
 import {
   bytesToHex,
   deriveKeyPairFromPassword,
@@ -6,11 +7,7 @@ import {
   generateKeyPair,
   generateSalt,
   hexToBytes,
-} from "@app/shared";
-// ECIES helpers live in `packages/shared/src/ecies.ts` and are consumed
-// by apps/api (encryption, backup) and apps/web (setup, unlock). Test
-// hosted in apps/api so its coverage report includes the shared file.
-import { describe, expect, test } from "bun:test";
+} from "../src/ecies";
 
 describe("hex helpers", () => {
   test("bytesToHex / hexToBytes round-trip", () => {
@@ -46,7 +43,7 @@ describe("generateSalt", () => {
 });
 
 describe("deriveKeyPairFromPassword", () => {
-  test("same password + salt → same keypair (deterministic)", async () => {
+  test("same password + salt produce the same keypair (deterministic)", async () => {
     const salt = "11".repeat(32);
     const kp1 = await deriveKeyPairFromPassword("hunter2", salt);
     const kp2 = await deriveKeyPairFromPassword("hunter2", salt);
