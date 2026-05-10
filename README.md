@@ -54,7 +54,7 @@ bun run clean        # Remove build artifacts
 apps/api/        Hono API with OpenAPI; Drizzle schema lives per-module
 apps/web/        React 19 SPA (TanStack Router file-based)
 packages/shared/ ECIES utilities used by both api and web
-packages/config/ Shared TS config
+packages/tsconfig/ Shared TS config
 docs/            Architecture, module standards, deployment, rebranding
 tests/e2e/       Live e2e harness (dex + API)
 scripts/         compile / clean / check-i18n / dev-dex
