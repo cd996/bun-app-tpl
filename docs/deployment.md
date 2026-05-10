@@ -1,0 +1,277 @@
+# Deployment
+
+> Examples assume the default `BASE_PATH=/app`; substitute your own `BASE_PATH` if you have changed it.
+
+The build target is a single Bun executable. Production typically pairs that with a reverse proxy and a persistent volume for the SQLite database and uploaded attachments.
+
+## Build options
+
+```bash
+# Single binary (recommended for Linux servers)
+bun run compile
+# → dist/app  (~80–100 MB; SHA-256 written to dist/checksums.txt)
+
+# Container image
+docker build -t myapp .
+```
+
+The container's runtime base is `zzci/ubase` by default — change it in `Dockerfile` if you prefer a stock distroless or Alpine image. The compiled binary embeds the frontend assets and Drizzle migrations so the runtime layer only needs glibc + the libsql native binding (already copied in).
+
+## Required environment
+
+| Variable | Why |
+|---|---|
+| `APP_NAME`, `APP_DISPLAY_NAME` | Branding (see [`rebranding.md`](rebranding.md)) |
+| `ACCESS_URL` | Production redirect-URI base; forwarded headers are not trusted in prod |
+| `CORS_ORIGIN` | Comma-separated allow-list; fail-closed in prod when unset |
+| `BASE_PATH` | URL prefix; only set if it differs from `/<APP_NAME>` |
+| `DB_PATH` | Mount a persistent volume for this directory |
+| `DB_ENCRYPTION` | Defaults to `false` for dev convenience — set `true` in production |
+| `OAUTH_*` | OIDC issuer or full endpoint set, plus client id/secret |
+| `DEFAULT_ADMIN` | Comma-separated emails that get admin role on first login (no-op if users exist) |
+| `LOG_FILE` | Mounted log volume; pino writes JSON lines |
+| `AUDIT_RETENTION_DAYS` | `0` (keep forever) by default; set to e.g. `90` in long-running deployments to bound `audit_events` size |
+| `MAX_UPLOAD_BYTES` | Per-file cap for attachment uploads. Default `10485760` (10 MB) |
+| `MAX_ATTACHMENTS_PER_RESOURCE` | Per-resource attachment count cap. Default `20` |
+| `UPLOADS_TOTAL_BYTES` | Optional cumulative quota across attachment tables. `0` (default) disables. Uploads past this return 413 |
+
+## Volumes
+
+The container declares `VOLUME /app/data`. Inside that volume the runtime writes:
+
+| Path | Derived from | Holds | Backup priority |
+|---|---|---|---|
+| `${DB_PATH}` (default `${ROOT_DIR}/data/db/app.db`) | `DB_PATH` (or `ROOT_DIR` when unset) | `app.db`, `app.db-wal`, `app.db-shm`, `meta.db` | Critical |
+| `${ROOT_DIR}/data/uploads/documents/` | `ROOT_DIR` (always) | Document attachments | Critical |
+| `${ROOT_DIR}/data/uploads/todos/` | `ROOT_DIR` (always) | Todo attachments | Critical |
+| `${ROOT_DIR}/data/logs/` | `ROOT_DIR` (`LOG_FILE` may override the file path) | Runtime logs | Operational |
+
+**Watch out — the upload and log paths are *not* re-rooted by `DB_PATH`.** Overriding `DB_PATH` to a path outside `ROOT_DIR` does **not** relocate `data/uploads/` or `data/logs/` — those continue to write under `${ROOT_DIR}/data/`. The two safe operating modes are:
+
+1. **Recommended:** keep `ROOT_DIR=/app/data` (the Dockerfile default) and mount a single persistent volume at `/app/data`. The DB, uploads, and logs all land under it.
+2. **Advanced:** if you must split the DB onto a separate disk, set `ROOT_DIR` to the directory you actually mounted **and** set `DB_PATH` to an absolute path on the other volume. Do not assume changing only `DB_PATH` is enough.
+
+## Health checks
+
+The API exposes:
+
+- `GET /<base>/api/health` → `{status: "ok"}` (always 200 once the process is up; does not require unlock)
+- `GET /<base>/api/encryption/status` → `{initialized, locked, status}` (use this to gate readiness behind unlock)
+
+Recommended Kubernetes / docker-compose probe:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /app/api/health
+    port: 3000
+readinessProbe:
+  httpGet:
+    path: /app/api/encryption/status
+    port: 3000
+  # treat 200 + status=unlocked as ready; anything else means setup or unlock is pending
+```
+
+## Reference compose stack (local dev / smoke test)
+
+`examples/compose/` holds a reference docker-compose stack — app + a bundled `dex` IdP + a Caddy proxy — meant for local-development and smoke-test use. It is **not** a production deployable: dex ships with hardcoded test users, the proxy terminates plain HTTP, and the app runs against a self-signed IdP issuer. Treat it as the starting point you adapt for production: real IdP, real TLS, real secrets store.
+
+```bash
+cd examples/compose
+cp .env.example .env                # populate APP_NAME, secrets, ACCESS_URL, etc.
+docker compose up --build
+```
+
+Required env (in `.env` next to the compose file): `APP_NAME`, `APP_DISPLAY_NAME`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `ACCESS_URL`. The bootstrap token gating `/api/encryption/init` is auto-generated at every boot and printed to stderr / written to `<data dir>/bootstrap-token.txt` while the system is in setup mode (no `meta.db` yet) — there is nothing to set in `.env`. Strip the `dex` service and replace it with your real IdP for any non-toy deploy.
+
+## Reverse proxy
+
+Mount the app at `BASE_PATH` and pass the host header. Caddy example:
+
+```caddy
+your-domain.com {
+  reverse_proxy /app/* localhost:3000 {
+    header_up Host {host}
+    header_up X-Forwarded-Proto {scheme}
+  }
+  redir /app /app/  # trailing slash
+}
+```
+
+Set `ACCESS_URL=https://your-domain.com` in the app's env so OAuth callback URLs are stable.
+
+### TLS via Caddy automatic HTTPS
+
+For a public-internet deployment, Caddy will auto-issue a Let's Encrypt certificate when you give it a domain and a contact email:
+
+```caddy
+your-domain.com {
+  tls you@example.com
+  reverse_proxy /app/* app:3000 {
+    header_up Host {host}
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-For {remote_host}
+  }
+  redir /app /app/  # trailing slash
+}
+```
+
+The reference `examples/compose/Caddyfile` ships with plain `:80` for local smoke-testing — replace the site block with the form above (and forward 80/443 from the host) before pointing it at a real domain.
+
+## Trust Proxy
+
+`TRUST_PROXY` controls whether the app reads `X-Forwarded-For` to determine the client IP used for rate limits and audit logs.
+
+- **Default (`TRUST_PROXY=false`)** — the app uses the connection peer IP only. Safe everywhere; appropriate when the app is reachable directly or behind a single trusted proxy that does not need to attribute per-client IPs.
+- **`TRUST_PROXY=true`** — the app honours `X-Forwarded-For`. Set this **only** when every request reaches the app through a proxy that **overwrites** `X-Forwarded-For` with the verified client IP (e.g. a properly configured Caddy / NGINX / cloud load balancer).
+
+> **Security warning.** If you set `TRUST_PROXY=true` while the API is also reachable directly (port exposed on the host, alternate ingress, etc.), an attacker can spoof `X-Forwarded-For` to bypass per-IP rate limits and poison audit log attribution. Either keep the API exclusively behind the proxy (no direct exposure), or leave `TRUST_PROXY` at the default.
+
+## Production compose addendum
+
+The reference stack under `examples/compose/` is local-dev grade. For a production deployment, layer the items below on top of it (or maintain a separate `compose.prod.yml`).
+
+### Secrets
+
+Treat the following env vars as secrets and inject them via your platform's secret manager rather than committing them in `.env`:
+
+- `OAUTH_CLIENT_SECRET` — IdP client secret.
+- Master-password related material if you supply it via env (e.g. `MASTER_PASSWORD` for an automated unlock helper) — generally avoid this and unlock interactively.
+
+The encryption bootstrap token is **not** an env var — it is generated at every boot, surfaced via stderr and `<data dir>/bootstrap-token.txt`, and consumed once by the setup wizard. Pull it from container logs (`docker compose logs app | grep BOOTSTRAP_TOKEN`) or the on-disk file; both are removed on `/encryption/init` success.
+
+In compose, prefer `secrets:` files over `environment:` for the values that *are* secrets, so they do not show up in `docker inspect`:
+
+```yaml
+services:
+  app:
+    secrets:
+      - oauth_client_secret
+    environment:
+      OAUTH_CLIENT_SECRET_FILE: /run/secrets/oauth_client_secret
+
+secrets:
+  oauth_client_secret:
+    file: ./secrets/oauth_client_secret
+```
+
+(Wire `*_FILE` reading into your entrypoint, or use Docker Swarm / Kubernetes which read secret files natively.)
+
+### Resource limits and lifecycle
+
+```yaml
+services:
+  app:
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: "1.0"
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/app/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    depends_on:
+      dex:
+        condition: service_healthy
+```
+
+Pair `restart: unless-stopped` with the in-image `HEALTHCHECK` and use `depends_on: condition: service_healthy` so the app starts only after dependent services pass their checks.
+
+### Database snapshots
+
+Run an at-least-hourly snapshot sidecar — either `litestream` for continuous replication, or a simple `sqlite3 .backup` cron container that writes to a snapshot volume. Example sidecar:
+
+```yaml
+services:
+  db-snapshot:
+    image: alpine:3
+    restart: unless-stopped
+    volumes:
+      - app-data:/app/data:ro
+      - app-snapshots:/snapshots
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache sqlite tini
+        while true; do
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          sqlite3 /app/data/db/app.db ".backup '/snapshots/app-${ts}.db'"
+          find /snapshots -name 'app-*.db' -mtime +7 -delete
+          sleep 3600
+        done
+```
+
+For anything past a single-tenant tool, prefer [litestream](https://litestream.io/) replicating to S3-compatible storage.
+
+### Logs volume
+
+Mount a separate volume for `${ROOT_DIR}/data/logs/` (or set `LOG_FILE` to a path on a dedicated volume) so log retention does not compete with DB snapshots for disk pressure.
+
+## Logging
+
+Two output modes are supported:
+
+- **File (default)** — `LOG_FILE` controls the destination. Pino writes JSON lines. Rotate with logrotate or your platform's log shipper.
+- **Stdout** — set `LOG_TO_STDOUT=true` to write JSON lines to stdout instead of a file. **Recommended for container deployments**: the orchestrator (Docker, Kubernetes) collects stdout, attaches metadata, and ships it onward — no rotate-on-disk required.
+
+Logrotate snippet (for the `LOG_FILE` case):
+
+```
+/app/data/logs/app.log {
+  hourly
+  rotate 168
+  size 50M
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+}
+```
+
+`copytruncate` is correct here because the app keeps the file descriptor open; reopening on `HUP` is not implemented.
+
+## Operations runbook
+
+Day-2 procedures (master-password rotation, lost-password recovery, snapshot restore, audit-log investigation) live in [`operations.md`](operations.md). Bookmark it before you cut over to production.
+
+## Backup & restore
+
+### Database
+
+The DB is a single SQLite file with WAL. Two viable strategies:
+
+1. **`sqlite3 .backup`** — atomic, doesn't block writers. Run out-of-band via cron; pair with `gpg --encrypt` if the box doesn't host the master password.
+2. **[litestream](https://litestream.io/)** — continuous WAL replication to S3-compatible storage. Recommended for anything past a single-tenant tool.
+
+### Application-level export
+
+The `/api/backup/export` admin endpoint produces a JSON dump of selected modules. It requires the master password to prove DEK ownership, and import is **schema-version-locked** — see "Upgrade" below.
+
+### Uploaded files
+
+`data/uploads/` is plain filesystem storage. Snapshot it together with the DB; orphaned blobs will eventually be reclaimed by the cleanup job, but mismatched DB+disk states will produce dangling references.
+
+## Upgrade playbook
+
+SQLite migrations are embedded in the binary and run on boot. The risky cases:
+
+| Change | Path |
+|---|---|
+| Add table / add nullable column | Drop in. Bring up new binary; migration auto-runs. |
+| Add NOT NULL column with default | Same — defaults apply during migration. |
+| Drop or rename column | Stop traffic, snapshot DB, deploy new binary. Drizzle's "create new table + copy + swap" runs at boot; verify size and row count after. |
+| Major schema reshuffle | Use `/api/backup/export` (still on old binary), deploy new binary, `/api/backup/import` to a fresh DB. Skip in-place migration entirely. |
+
+Always run a restore drill (export → import on a scratch DB) before a production upgrade — it's the only way to know the schema-version locked import path is still intact.
+
+### Master-key rotation
+
+`/api/encryption/rotate-dek` is marked **EXPERIMENTAL** — known `SQLITE_IOERR` on busy WAL. The e2e suite asserts the current 500/`ROTATE_FAILED` contract so a future fix is detected automatically. Until it lands, prefer `/api/encryption/change-master` (changes the master password / re-wraps the DEK without touching ciphertext).
+
+## Disabling encryption
+
+Setting `DB_ENCRYPTION=false` skips the locked/unlocked dance entirely — useful for staging or air-gapped boxes where the OS already encrypts the disk. Once turned off, do not flip back on against a populated DB without going through the export → fresh init → import path.

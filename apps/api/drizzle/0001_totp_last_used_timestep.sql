@@ -1,0 +1,1 @@
+ALTER TABLE `user_totp_devices` ADD `last_used_timestep` integer DEFAULT 0 NOT NULL;

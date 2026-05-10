@@ -1,0 +1,32 @@
+{
+  "searchPlaceholder": "Search by name, email, or username...",
+  "allRoles": "All Roles",
+  "allStatuses": "All Statuses",
+  "totalCount": "{{count}} users",
+  "noResults": "No users found.",
+  "statusActive": "Active",
+  "statusDisabled": "Disabled",
+  "col": {
+    "username": "Username",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "lastLogin": "Last Login",
+    "groups": "Groups",
+    "actions": "Actions"
+  },
+  "promote": "Promote",
+  "demote": "Demote",
+  "enable": "Enable",
+  "disable": "Disable",
+  "promoteTitle": "Promote to Admin",
+  "promoteConfirm": "Are you sure you want to promote \"{{name}}\" to admin? They will gain full administrative privileges.",
+  "demoteTitle": "Demote to User",
+  "demoteConfirm": "Are you sure you want to demote \"{{name}}\" to regular user? They will lose administrative privileges.",
+  "confirm": "Confirm",
+  "tabs": {
+    "users": "Users",
+    "groups": "Groups"
+  }
+}

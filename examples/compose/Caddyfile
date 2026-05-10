@@ -1,0 +1,13 @@
+# Caddyfile for compose.yml in this directory.
+:80 {
+	# Application — mount under BASE_PATH (default /app, override via env).
+	# Caddy strips nothing; the API expects to see ${BASE_PATH}/api/* requests.
+	reverse_proxy /app/* app:3000 {
+		header_up Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	# Friendly redirect from / to /app/.
+	redir / /app/ 308
+}
