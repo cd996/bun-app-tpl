@@ -29,8 +29,8 @@ RUN set -e; \
   fi; \
   src="$(ls -d /app/node_modules/.bun/libsql@*/)"; \
   mkdir -p /app/_libsql/@libsql; \
-  cp -r "$src/node_modules/@libsql/linux-x64-gnu" /app/_libsql/@libsql/linux-x64-gnu; \
-  cp -r "$src/node_modules/libsql" /app/_libsql/libsql
+  cp -rL "$src/node_modules/@libsql/linux-x64-gnu" /app/_libsql/@libsql/linux-x64-gnu; \
+  cp -rL "$src/node_modules/libsql" /app/_libsql/libsql
 
 # ---- Runtime stage ----
 FROM zzci/ubase

@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Utils Library",
-  "extends": "./base.json",
-  "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true
-  }
-}
