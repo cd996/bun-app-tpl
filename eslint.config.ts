@@ -16,6 +16,9 @@ export default antfu({
   ignores: [
     "**/*.json",
     "**/*.toml",
+    "**/*.md",
+    "**/*.yml",
+    "**/*.yaml",
     "apps/api/drizzle/**",
     "apps/web/src/shared/components/ui/**",
     "apps/web/src/app/routeTree.gen.ts",

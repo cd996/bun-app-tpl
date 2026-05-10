@@ -16,7 +16,6 @@ const all = args.has("--all");
 const targets = [
   // Build output
   "dist",
-  "packages/shared/dist",
   // Vite cache
   "apps/web/.vite",
   "apps/web/.tanstack",

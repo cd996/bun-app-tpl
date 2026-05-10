@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   bytesToHex,
   deriveKeyPairFromPassword,
@@ -10,31 +10,31 @@ import {
 } from "../src/ecies";
 
 describe("hex helpers", () => {
-  test("bytesToHex / hexToBytes round-trip", () => {
+  it("bytesToHex / hexToBytes round-trip", () => {
     const bytes = new Uint8Array([0, 1, 15, 16, 254, 255]);
     expect(bytesToHex(bytes)).toBe("00010f10feff");
     expect(hexToBytes(bytesToHex(bytes))).toEqual(bytes);
   });
 
-  test("hexToBytes handles uppercase + lowercase", () => {
+  it("hexToBytes handles uppercase + lowercase", () => {
     expect(bytesToHex(hexToBytes("ABCDEF"))).toBe("abcdef");
   });
 });
 
 describe("generateKeyPair", () => {
-  test("returns 32-byte private + 65-byte uncompressed public, both hex", () => {
+  it("returns 32-byte private + 65-byte uncompressed public, both hex", () => {
     const kp = generateKeyPair();
     expect(kp.privateKey).toMatch(/^[0-9a-f]{64}$/);
     expect(kp.publicKey).toMatch(/^04[0-9a-f]{128}$/);
   });
 
-  test("each call produces a fresh key", () => {
+  it("each call produces a fresh key", () => {
     expect(generateKeyPair().privateKey).not.toBe(generateKeyPair().privateKey);
   });
 });
 
 describe("generateSalt", () => {
-  test("returns 32 random bytes hex-encoded", () => {
+  it("returns 32 random bytes hex-encoded", () => {
     const a = generateSalt();
     const b = generateSalt();
     expect(a).toMatch(/^[0-9a-f]{64}$/);
@@ -43,7 +43,7 @@ describe("generateSalt", () => {
 });
 
 describe("deriveKeyPairFromPassword", () => {
-  test("same password + salt produce the same keypair (deterministic)", async () => {
+  it("same password + salt produce the same keypair (deterministic)", async () => {
     const salt = "11".repeat(32);
     const kp1 = await deriveKeyPairFromPassword("hunter2", salt);
     const kp2 = await deriveKeyPairFromPassword("hunter2", salt);
@@ -51,13 +51,13 @@ describe("deriveKeyPairFromPassword", () => {
     expect(kp1.publicKey).toBe(kp2.publicKey);
   });
 
-  test("different salts produce different keys", async () => {
+  it("different salts produce different keys", async () => {
     const a = await deriveKeyPairFromPassword("hunter2", "11".repeat(32));
     const b = await deriveKeyPairFromPassword("hunter2", "22".repeat(32));
     expect(a.privateKey).not.toBe(b.privateKey);
   });
 
-  test("different passwords produce different keys", async () => {
+  it("different passwords produce different keys", async () => {
     const salt = "11".repeat(32);
     const a = await deriveKeyPairFromPassword("hunter2", salt);
     const b = await deriveKeyPairFromPassword("hunter3", salt);
@@ -66,7 +66,7 @@ describe("deriveKeyPairFromPassword", () => {
 });
 
 describe("eciesEncrypt + eciesDecrypt", () => {
-  test("round-trips a plaintext under a freshly-generated keypair", async () => {
+  it("round-trips a plaintext under a freshly-generated keypair", async () => {
     const kp = generateKeyPair();
     const plaintext = new TextEncoder().encode("the quick brown fox");
     const ct = await eciesEncrypt(kp.publicKey, plaintext);
@@ -76,7 +76,7 @@ describe("eciesEncrypt + eciesDecrypt", () => {
     expect(new TextDecoder().decode(recovered)).toBe("the quick brown fox");
   });
 
-  test("each encryption produces a fresh ciphertext (random IV + ephemeral key)", async () => {
+  it("each encryption produces a fresh ciphertext (random IV + ephemeral key)", async () => {
     const kp = generateKeyPair();
     const plaintext = new Uint8Array([1, 2, 3]);
     const a = await eciesEncrypt(kp.publicKey, plaintext);
@@ -84,18 +84,18 @@ describe("eciesEncrypt + eciesDecrypt", () => {
     expect(bytesToHex(a)).not.toBe(bytesToHex(b));
   });
 
-  test("eciesDecrypt with the wrong private key fails", async () => {
+  it("eciesDecrypt with the wrong private key fails", async () => {
     const kp = generateKeyPair();
     const other = generateKeyPair();
     const ct = await eciesEncrypt(kp.publicKey, new Uint8Array([42]));
     await expect(eciesDecrypt(other.privateKey, ct)).rejects.toThrow();
   });
 
-  test("rejects an invalid public-key hex", async () => {
+  it("rejects an invalid public-key hex", async () => {
     await expect(eciesEncrypt("not-a-key", new Uint8Array([1]))).rejects.toThrow();
   });
 
-  test("works with password-derived keypair (used by setup / unlock)", async () => {
+  it("works with password-derived keypair (used by setup / unlock)", async () => {
     const salt = "33".repeat(32);
     const kp = await deriveKeyPairFromPassword("password", salt);
     const ct = await eciesEncrypt(kp.publicKey, new TextEncoder().encode("deadbeef"));
