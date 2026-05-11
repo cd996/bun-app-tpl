@@ -11,12 +11,14 @@ const configSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
   DB_PATH: z.string().default("data/db/app.db"),
   DB_ENCRYPTION: z.enum(["true", "false"]).default("false").transform(v => v === "true"),
-  // Application slug — lowercase letters, digits, dashes. Used as the default
-  // BASE_PATH, backup filename prefix, localStorage namespace, etc.
+  // Application slug — lowercase letters, digits, dashes. Used as the
+  // backup filename prefix, localStorage namespace, etc.
   APP_NAME: z.string().regex(RE_APP_NAME, "APP_NAME must match /^[a-z][a-z0-9-]*$/").default("app"),
   // Human-readable display name used in HTML title, TOTP issuer, etc.
   APP_DISPLAY_NAME: z.string().min(1).default("App"),
-  // Optional override; when unset, derived from APP_NAME (e.g. "/app").
+  // URL prefix the app is mounted under. Empty (default) means the app is
+  // served at root: SPA at "/" and API at "/api". When set, the value is
+  // normalised so "app", "/app", and "/app/" all resolve to "/app".
   BASE_PATH: z.string().default(""),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_FILE: z.string().default("data/logs/app.log"),
@@ -204,8 +206,8 @@ export async function loadConfig(): Promise<Config> {
     }
   }
 
-  const rawBasePath = data.BASE_PATH || `/${data.APP_NAME}`;
-  const basePath = `/${rawBasePath.replace(RE_SLASH_TRIM, "")}`;
+  const trimmedBase = data.BASE_PATH.replace(RE_SLASH_TRIM, "");
+  const basePath = trimmedBase ? `/${trimmedBase}` : "";
 
   return {
     ...data,

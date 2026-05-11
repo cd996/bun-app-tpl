@@ -1,6 +1,6 @@
 # Deployment
 
-> Examples assume the default `BASE_PATH=/app`; substitute your own `BASE_PATH` if you have changed it.
+> Examples assume `BASE_PATH=/app`. The app is mounted at root (`/`) by default; set `BASE_PATH` to serve under a URL prefix (e.g. behind a reverse-proxy mount).
 
 The build target is a single Bun executable. Production typically pairs that with a reverse proxy and a persistent volume for the SQLite database and uploaded attachments.
 
@@ -24,7 +24,7 @@ The container's runtime base is `zzci/ubase` by default — change it in `Docker
 | `APP_NAME`, `APP_DISPLAY_NAME` | Branding (see [`rebranding.md`](rebranding.md)) |
 | `ACCESS_URL` | Production redirect-URI base; forwarded headers are not trusted in prod |
 | `CORS_ORIGIN` | Comma-separated allow-list; fail-closed in prod when unset |
-| `BASE_PATH` | URL prefix; only set if it differs from `/<APP_NAME>` |
+| `BASE_PATH` | URL prefix the app is mounted under. Leave unset for root mount; set to the reverse-proxy mount (e.g. `/app`) when serving under a prefix |
 | `DB_PATH` | Mount a persistent volume for this directory |
 | `DB_ENCRYPTION` | Defaults to `false` for dev convenience — set `true` in production |
 | `OAUTH_*` | OIDC issuer or full endpoint set, plus client id/secret |

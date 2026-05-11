@@ -21,7 +21,7 @@ When forking this template, customize the following before you start adding feat
 
 ### 1. Identity
 
-- Set `APP_NAME` (slug, e.g. `myapp`) and `APP_DISPLAY_NAME` (e.g. `My App`) in `.env`. `BASE_PATH`, the static-asset URL prefix in `scripts/compile.ts`, the HTML `<title>`, the TOTP issuer, the backup filename, and the unlock-challenge `sessionStorage` key all derive from these.
+- Set `APP_NAME` (slug, e.g. `myapp`) and `APP_DISPLAY_NAME` (e.g. `My App`) in `.env`. The HTML `<title>`, TOTP issuer, backup filename, and unlock-challenge `sessionStorage` key all derive from these. `BASE_PATH` is unset by default (app mounts at root); set it to serve under a URL prefix.
 - Logo and favicon: replace `apps/web/public/logo.svg` and the inline `<Logo>` in `apps/web/src/shared/components/logo.tsx`.
 - Package scope is `@app/*` by convention. Rename only if you need a different scope (it does not appear in any user-visible surface).
 

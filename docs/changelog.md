@@ -6,7 +6,7 @@ Template release notes. Format adapted from [Keep a Changelog](https://keepachan
 
 ### Added
 
-- `APP_NAME` (slug) and `APP_DISPLAY_NAME` env vars drive HTML title, TOTP issuer, backup filename, sessionStorage namespace, default `BASE_PATH`, and the compiled binary's static-asset prefix. Frontend reads via `apps/web/src/shared/lib/branding.ts`; API reads `Bun.env`.
+- `APP_NAME` (slug) and `APP_DISPLAY_NAME` env vars drive HTML title, TOTP issuer, backup filename, and sessionStorage namespace. Frontend reads via `apps/web/src/shared/lib/branding.ts`; API reads `Bun.env`.
 - `scripts/dev-dex.ts` and `bun run dev:dex` — starts a bundled dex IdP and the dev server with matching `OAUTH_*` env in one command.
 - `examples/compose/` reference stack: `compose.yml`, `Caddyfile`, `dex.yaml`, `.env.example` — local-development / smoke-test grade docker-compose stack.
 - `docs/rebranding.md` cataloguing every env-driven and manual rebranding surface.
@@ -28,6 +28,7 @@ Template release notes. Format adapted from [Keep a Changelog](https://keepachan
 
 ### Changed
 
+- `BASE_PATH` is now unset by default — the app mounts at root (`/`) with the API at `/api`. Previously it derived from `APP_NAME` (`/app`). Set `BASE_PATH` explicitly to serve under a URL prefix; `app`, `/app`, and `/app/` all normalise to `/app`.
 - Workspace scope renamed `@access/*` → `@app/*`; `bun.lock` regenerated.
 - Locked / unlocked app split: `routes/setup.ts` owns init/unlock/challenge while locked; `routes/protected.ts` mounts business + admin only when unlocked. `/api/health` returns 503 while locked so orchestrators detect stuck instances.
 - `/encryption/status` payload trimmed to `{initialized, locked, status, dbError}` (no `kdfSalt` / `encryptedDek` / challenge leak).

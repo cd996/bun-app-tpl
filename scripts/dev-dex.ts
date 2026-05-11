@@ -29,7 +29,12 @@ const DEX_CONFIG = join(DEX_DEV_DIR, "config.yaml");
 const DEX_PORT = Number(process.env.DEV_DEX_PORT ?? 5567);
 const DEV_PORT = process.env.PORT ?? "3000";
 const APP_NAME = process.env.APP_NAME ?? "app";
-const BASE_PATH = process.env.BASE_PATH ?? `/${APP_NAME}`;
+// Normalise BASE_PATH like apps/api/src/config.ts: empty means root, otherwise
+// "/<x>" with no trailing slash. The OAuth callback URL is built from
+// ACCESS_URL + this prefix, so an unset BASE_PATH yields a root-mounted
+// callback (e.g. http://localhost:3000/api/account/auth/callback).
+const trimmedBase = (process.env.BASE_PATH ?? "").replace(/^\/+|\/+$/g, "");
+const BASE_PATH = trimmedBase ? `/${trimmedBase}` : "";
 const ACCESS_URL = process.env.ACCESS_URL ?? `http://localhost:${DEV_PORT}`;
 const DEFAULT_ADMIN = process.env.DEFAULT_ADMIN ?? "admin@example.com";
 

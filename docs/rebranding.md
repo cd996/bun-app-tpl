@@ -13,7 +13,6 @@ If you set those before running `bun run dev` / `bun run build` / `bun run compi
 
 | Surface | Where |
 |---|---|
-| Default `BASE_PATH` (`/<APP_NAME>`) | `apps/api/src/config.ts`, `apps/web/vite.config.ts` |
 | Static-asset URL prefix in compiled binary | `scripts/compile.ts` |
 | Backup download filename (`<APP_NAME>-backup-*.json`) | `apps/api/src/modules/backup/export.routes.ts`, `apps/web/src/app/routes/_app/admin/settings.lazy.tsx` |
 | Master-key download filename | `apps/web/src/app/routes/setup.tsx` |
@@ -60,12 +59,10 @@ rg -i \
 
 ## Reverse-proxy mounting
 
-`BASE_PATH` lets you serve under any prefix:
+`BASE_PATH` is unset by default — the app mounts at root (`/`). Set it to serve under a URL prefix:
 
 ```bash
-APP_NAME=myapp              # → BASE_PATH defaults to /myapp
-# or override explicitly:
 BASE_PATH=/tools/myapp
 ```
 
-The reverse proxy must mount the app at the same prefix and forward the `Host` header (or set `ACCESS_URL` to your public URL — required in production).
+`BASE_PATH` accepts `myapp`, `/myapp`, or `/myapp/`; all three normalise to `/myapp`. The reverse proxy must mount the app at the same prefix and forward the `Host` header (or set `ACCESS_URL` to your public URL — required in production).

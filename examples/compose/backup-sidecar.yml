@@ -29,7 +29,7 @@ services:
         condition: service_started
     environment:
       APP_NAME: ${APP_NAME:-app}
-      BASE_PATH: ${BASE_PATH:-/${APP_NAME:-app}}
+      BASE_PATH: ${BASE_PATH:-}
       SERVICE_TOKEN: ${SERVICE_TOKEN}
       RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}

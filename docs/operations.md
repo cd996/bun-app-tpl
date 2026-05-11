@@ -1,6 +1,6 @@
 # Operations Runbook
 
-Day-2 procedures for operators. All examples assume the default `BASE_PATH=/app`; substitute your own `BASE_PATH` if you have changed it. Endpoints are described in [`api.md`](api.md); deployment context in [`deployment.md`](deployment.md).
+Day-2 procedures for operators. Examples assume `BASE_PATH=/app`. The app is mounted at root (`/`) by default; drop the `/app` prefix from the paths below if you have not set `BASE_PATH`. Endpoints are described in [`api.md`](api.md); deployment context in [`deployment.md`](deployment.md).
 
 ---
 
