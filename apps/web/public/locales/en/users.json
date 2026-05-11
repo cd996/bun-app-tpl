@@ -1,6 +1,8 @@
 {
   "searchPlaceholder": "Search by name, email, or username...",
   "allRoles": "All Roles",
+  "roleAdmin": "Admin",
+  "roleUser": "User",
   "allStatuses": "All Statuses",
   "totalCount": "{{count}} users",
   "noResults": "No users found.",

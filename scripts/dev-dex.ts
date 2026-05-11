@@ -1,42 +1,82 @@
 #!/usr/bin/env bun
 /* eslint-disable no-console */
 /**
- * Single-command dev: bundled dex IdP + the regular Vite/API dev server.
+ * Bundled dex IdP for local development.
  *
- * Usage:  bun run dev:dex
+ * Usage:
+ *   bun run dev:dex                                    # auto-detect via nsl
+ *   bun run dev:dex --issuer https://idp.example.com   # override public URL
+ *   bun run dev:dex --access-url https://app.example.com
+ *   bun run dev:dex --client-id myapp --client-secret xyz
  *
- * Implementation:
- *   1. Ensure the dex binary exists in tests/e2e/.cache/dex (extract from
- *      the official OCI image — no docker daemon needed).
- *   2. Render a per-run dex config under tests/e2e/.cache/dev-dex/config.yaml
- *      with redirect URI derived from BASE_PATH / APP_NAME / ACCESS_URL.
- *   3. Spawn dex; wait for the discovery endpoint.
- *   4. Spawn `bun run --filter @app/* dev` with matching OAUTH_* env so the
- *      API picks up the bundled IdP without any .env editing.
- *   5. Forward Ctrl-C to both processes; tear down when either exits.
+ * Note on issuer: OIDC pins the issuer string into every id_token, so a
+ * single dex instance can serve only ONE issuer at a time. To use a
+ * different URL (e.g. switch local HTTP ↔ external HTTPS), restart this
+ * script with a different `--issuer` / `--access-url`. There is no way to
+ * make one dex instance answer for both URLs simultaneously.
+ *
+ * This script ONLY runs dex. Start the app separately with `bun run dev`
+ * in another terminal; the app reads OAUTH_* from `.env`.
+ *
+ * Resolution priority for every knob:  CLI flag > env var > nsl get > default
  */
 import type { Subprocess } from "bun";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import process from "node:process";
+import { parseArgs } from "node:util";
 import { $ } from "bun";
+
+const { values: cli } = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    "issuer": { type: "string" },
+    "access-url": { type: "string" },
+    "client-id": { type: "string" },
+    "client-secret": { type: "string" },
+    "admin": { type: "string" },
+  },
+  strict: true,
+  allowPositionals: false,
+});
 
 const ROOT = resolve(import.meta.dir, "..");
 const E2E_DIR = join(ROOT, "tests/e2e");
 const DEX_BIN = join(E2E_DIR, ".cache/dex");
 const DEX_DEV_DIR = join(E2E_DIR, ".cache/dev-dex");
 const DEX_CONFIG = join(DEX_DEV_DIR, "config.yaml");
-const DEX_PORT = Number(process.env.DEV_DEX_PORT ?? 5567);
-const DEV_PORT = process.env.PORT ?? "3000";
 const APP_NAME = process.env.APP_NAME ?? "app";
-// Normalise BASE_PATH like apps/api/src/config.ts: empty means root, otherwise
-// "/<x>" with no trailing slash. The OAuth callback URL is built from
-// ACCESS_URL + this prefix, so an unset BASE_PATH yields a root-mounted
-// callback (e.g. http://localhost:3000/api/account/auth/callback).
+
+// Normalise BASE_PATH like apps/api/src/config.ts: empty means root,
+// otherwise "/<x>" with no trailing slash. Used to build the OAuth callback
+// URI that dex will whitelist.
 const trimmedBase = (process.env.BASE_PATH ?? "").replace(/^\/+|\/+$/g, "");
 const BASE_PATH = trimmedBase ? `/${trimmedBase}` : "";
-const ACCESS_URL = process.env.ACCESS_URL ?? `http://localhost:${DEV_PORT}`;
-const DEFAULT_ADMIN = process.env.DEFAULT_ADMIN ?? "admin@example.com";
+
+// `nsl get` answers based on the daemon's port regardless of whether the
+// route is registered yet, so this works before our own `nsl run` call.
+function nslGet(name: string): string | null {
+  const result = Bun.spawnSync(["nsl", "get", name]);
+  const url = result.stdout.toString().trim();
+  return result.exitCode === 0 && url.startsWith("http") ? url : null;
+}
+
+// App is served as `${APP_NAME}.localhost`; dex is a sibling single-label
+// subdomain `dex-${APP_NAME}.localhost`. The hyphen (rather than a dot)
+// keeps the hostname one level deep so nsl's `*.localhost` wildcard TLS
+// cert covers both, while the browser still sees two independent origins
+// for cookie / CORS purposes.
+const APP_URL_DEFAULT = nslGet(APP_NAME) ?? "http://localhost:3000";
+const DEX_URL_DEFAULT = nslGet(`dex-${APP_NAME}`) ?? "http://localhost:5567";
+
+// The dex issuer and the app's `OAUTH_ISSUER` must be identical (OIDC pins
+// the issuer into every id_token). Treat OAUTH_ISSUER as the canonical
+// source so one .env entry feeds both this script and the API.
+const ACCESS_URL = cli["access-url"] ?? process.env.ACCESS_URL ?? APP_URL_DEFAULT;
+const DEX_ISSUER = cli.issuer ?? process.env.OAUTH_ISSUER ?? DEX_URL_DEFAULT;
+const OAUTH_CLIENT_ID = cli["client-id"] ?? process.env.OAUTH_CLIENT_ID ?? APP_NAME;
+const OAUTH_CLIENT_SECRET = cli["client-secret"] ?? process.env.OAUTH_CLIENT_SECRET ?? `${APP_NAME}-secret`;
+const DEFAULT_ADMIN = cli.admin ?? process.env.DEFAULT_ADMIN ?? "admin@test.io";
 
 if (!existsSync(DEX_BIN)) {
   console.log("[dev-dex] installing dex binary…");
@@ -44,11 +84,21 @@ if (!existsSync(DEX_BIN)) {
 }
 
 mkdirSync(DEX_DEV_DIR, { recursive: true });
-const dexConfig = `issuer: http://127.0.0.1:${DEX_PORT}/dex
+// `issuer` is the public-facing URL the browser sees (via nsl); `web.http`
+// is the loopback bind address that nsl proxies to. Dex uses the path
+// component of `issuer` as a prefix for every endpoint, so a path-less
+// hostname like `dex-app.localhost` makes dex serve `/auth`, `/token`, … at
+// the root — exactly what `nsl run --name dex-app` forwards.
+//
+// `__PORT__` is filled in at launch time by the sh wrapper below, from the
+// `$PORT` env that nsl injects into the spawned child. Templating the file
+// means we do not have to commit to a fixed port in advance — nsl can pick
+// one from its allocation range and dex picks up the same value.
+const dexConfigTemplate = `issuer: ${DEX_ISSUER}
 storage:
   type: memory
 web:
-  http: 127.0.0.1:${DEX_PORT}
+  http: 127.0.0.1:__PORT__
   allowedOrigins: ["*"]
 oauth2:
   skipApprovalScreen: true
@@ -57,8 +107,8 @@ expiry:
   refreshTokens:
     validIfNotUsedFor: 24h
 staticClients:
-  - id: ${APP_NAME}
-    secret: ${APP_NAME}-secret
+  - id: ${OAUTH_CLIENT_ID}
+    secret: ${OAUTH_CLIENT_SECRET}
     redirectURIs:
       - ${ACCESS_URL}${BASE_PATH}/api/account/auth/callback
     name: ${APP_NAME} dev
@@ -69,26 +119,36 @@ staticPasswords:
     hash: "$2b$10$ZDM1j7ol1V4C0pDIyN.uu.eitELj7.LOvYhkA5nXLi/yBoP9.mynC"
     username: admin
     userID: dev-admin
-  - email: user@example.com
+  - email: user@test.io
     hash: "$2b$10$ZDM1j7ol1V4C0pDIyN.uu.eitELj7.LOvYhkA5nXLi/yBoP9.mynC"
     username: user
     userID: dev-user
 `;
-writeFileSync(DEX_CONFIG, dexConfig);
+const DEX_CONFIG_TEMPLATE = `${DEX_CONFIG}.template`;
+writeFileSync(DEX_CONFIG_TEMPLATE, dexConfigTemplate);
 
-const dexBase = `http://127.0.0.1:${DEX_PORT}/dex`;
+// Inline sh wrapper: substitute `__PORT__` → `$PORT` (set by nsl) into the
+// final dex config, then exec dex. `exec` keeps dex as the direct child of
+// nsl so signals (and lifetime) propagate without an extra layer.
+const launchScript = `sed "s/__PORT__/$PORT/g" ${DEX_CONFIG_TEMPLATE} > ${DEX_CONFIG} && exec ${DEX_BIN} serve ${DEX_CONFIG}`;
 
-console.log(`[dev-dex] starting dex on ${dexBase}`);
-const dex: Subprocess = Bun.spawn([DEX_BIN, "serve", DEX_CONFIG], {
-  stdout: "inherit",
-  stderr: "inherit",
-});
+console.log(`[dev-dex] starting dex on ${DEX_ISSUER}`);
+const dex: Subprocess = Bun.spawn(
+  ["nsl", "run", "--name", `dex-${APP_NAME}`, "--force", "sh", "-c", launchScript],
+  {
+    cwd: ROOT,
+    stdout: "inherit",
+    stderr: "inherit",
+  },
+);
 
+// Probe through the nsl-exposed URL so we confirm both dex AND the proxy
+// route are live before declaring success.
 const deadline = Date.now() + 15_000;
 let dexReady = false;
 while (Date.now() < deadline) {
   try {
-    const r = await fetch(`${dexBase}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(2000) });
+    const r = await fetch(`${DEX_ISSUER}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(2000) });
     if (r.ok) {
       dexReady = true;
       break;
@@ -104,25 +164,14 @@ if (!dexReady) {
   dex.kill();
   process.exit(1);
 }
-console.log(`[dev-dex] dex ready · login: admin@example.com / admin`);
-
-console.log(`[dev-dex] starting dev server (DEFAULT_ADMIN=${DEFAULT_ADMIN})`);
-const dev: Subprocess = Bun.spawn(["bun", "run", "--filter", "@app/*", "dev"], {
-  cwd: ROOT,
-  stdout: "inherit",
-  stderr: "inherit",
-  env: {
-    ...process.env,
-    APP_NAME,
-    BASE_PATH,
-    ACCESS_URL,
-    OAUTH_ISSUER: dexBase,
-    OAUTH_CLIENT_ID: APP_NAME,
-    OAUTH_CLIENT_SECRET: `${APP_NAME}-secret`,
-    OAUTH_PKCE: "true",
-    DEFAULT_ADMIN,
-  },
-});
+console.log(`[dev-dex] dex ready · login: ${DEFAULT_ADMIN} / admin`);
+console.log("[dev-dex] expected .env (matching values):");
+console.log(`            OAUTH_ISSUER=${DEX_ISSUER}`);
+console.log(`            OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}`);
+console.log(`            OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}`);
+console.log(`            ACCESS_URL=${ACCESS_URL}`);
+console.log(`            DEFAULT_ADMIN=${DEFAULT_ADMIN}`);
+console.log("[dev-dex] run `bun run dev` in another terminal to start the app.");
 
 let stopped = false;
 async function stop(): Promise<void> {
@@ -130,17 +179,14 @@ async function stop(): Promise<void> {
     return;
   stopped = true;
   console.log("\n[dev-dex] shutting down");
-  dev.kill();
   dex.kill();
-  await dev.exited.catch(() => {});
   await dex.exited.catch(() => {});
   process.exit(0);
 }
 process.on("SIGINT", () => void stop());
 process.on("SIGTERM", () => void stop());
 
-// If either child exits early, take the other one down with it.
-void Promise.race([dex.exited, dev.exited]).then(() => void stop());
+void dex.exited.then(() => void stop());
 
-// Keep the script alive while children run.
+// Keep the script alive while dex runs.
 await new Promise(() => {});
