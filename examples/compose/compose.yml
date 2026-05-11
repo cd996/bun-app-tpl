@@ -31,7 +31,7 @@ services:
       PORT: 3000
       APP_NAME: ${APP_NAME:-app}
       APP_DISPLAY_NAME: ${APP_DISPLAY_NAME:-App}
-      BASE_PATH: ${BASE_PATH:-/${APP_NAME:-app}}
+      BASE_PATH: ${BASE_PATH:-}
       DB_PATH: /app/data/db/app.db
       LOG_FILE: /app/data/logs/app.log
       DB_ENCRYPTION: ${DB_ENCRYPTION:-true}

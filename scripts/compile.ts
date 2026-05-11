@@ -55,10 +55,10 @@ const MIGRATIONS_BACKUP = `${MIGRATIONS_FILE}.bak`;
 const target = (args.target as string | undefined) ?? null;
 
 // URL prefix the SPA is mounted under. Mirrors apps/api/src/config.ts:
-// BASE_PATH overrides; otherwise derive from APP_NAME (default "app").
+// unset / empty means root ("" — SPA at "/"); otherwise normalised to "/<x>".
 const RE_SLASH_TRIM = /^\/+|\/+$/g;
-const APP_NAME = process.env.APP_NAME ?? "app";
-const URL_PREFIX = `/${(process.env.BASE_PATH ?? `/${APP_NAME}`).replace(RE_SLASH_TRIM, "")}`;
+const trimmedBase = (process.env.BASE_PATH ?? "").replace(RE_SLASH_TRIM, "");
+const URL_PREFIX = trimmedBase ? `/${trimmedBase}` : "";
 
 const gitResult = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: ROOT });
 const commit = gitResult.stdout.toString().trim() || "unknown";

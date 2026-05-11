@@ -1,6 +1,6 @@
 # API
 
-> Examples assume the default `BASE_PATH=/app`; substitute your own `BASE_PATH` if you have changed it.
+> Examples assume `BASE_PATH=/app`. The app is mounted at root (`/`) by default — drop the `/app` prefix from paths when `BASE_PATH` is unset.
 
 This document describes the API surface implemented in the current codebase.
 

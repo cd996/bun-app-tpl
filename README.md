@@ -29,7 +29,7 @@ If you have your own OAuth/OIDC provider, set `OAUTH_*` in `.env` and run `bun r
 
 ## Customize
 
-- **Identity** — set `APP_NAME` (slug) and `APP_DISPLAY_NAME` in `.env`. HTML title, TOTP issuer, backup filename, sessionStorage namespace, and `BASE_PATH` all derive from these. See [`docs/rebranding.md`](docs/rebranding.md).
+- **Identity** — set `APP_NAME` (slug) and `APP_DISPLAY_NAME` in `.env`. HTML title, TOTP issuer, backup filename, and sessionStorage namespace derive from these. `BASE_PATH` is unset by default (root mount); set it to serve under a URL prefix. See [`docs/rebranding.md`](docs/rebranding.md).
 - **Modules** — keep what you need, drop the rest. See [`docs/README.md`](docs/README.md) §3.
 - **Logo** — replace `apps/web/public/logo.svg` and the inline SVG in `apps/web/src/shared/components/logo.tsx`.
 

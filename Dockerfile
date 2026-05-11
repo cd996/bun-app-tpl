@@ -67,19 +67,15 @@ ENV PORT=3000
 # `LOG_FILE` does not silently grow inside the image filesystem. Operators
 # running on bare metal can still set LOG_TO_STDOUT=false to write to disk.
 ENV LOG_TO_STDOUT=true
-# BASE_PATH defaults to /app so the healthcheck below resolves without
-# requiring a deploy-time env. Operators that override APP_NAME at runtime
-# should also set BASE_PATH=/${APP_NAME} (or the prefix the reverse proxy
-# mounts), otherwise the healthcheck CMD will probe the wrong URL.
-ENV BASE_PATH=/app
-
 USER app
 
 # Liveness only — `/api/health` returns 200 whenever the runtime responds.
 # Use `/api/health/ready` from the orchestrator (k8s readinessProbe, LB pool)
 # for "actually serving traffic". Splitting them prevents docker / k8s from
 # restarting a locked-but-healthy container that is just waiting for unlock.
+# BASE_PATH is unset by default (app mounts at root); when an operator sets
+# it to the reverse-proxy mount, this healthcheck URL stays correct.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT:-3000}${BASE_PATH:-/app}/api/health" >/dev/null || exit 1
+  CMD curl -fsS "http://127.0.0.1:${PORT:-3000}${BASE_PATH:-}/api/health" >/dev/null || exit 1
 
 ENTRYPOINT ["./app"]

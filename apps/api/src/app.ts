@@ -213,9 +213,14 @@ function buildOuterApp(api: OpenAPIHono<AppEnv>, config: Config) {
     return handler(c, next);
   });
 
-  app.get("/", (c) => {
-    return c.html(`<meta http-equiv="refresh" content="0;url=${base}/">`);
-  });
+  // When BASE_PATH is set, redirect bare "/" to "${base}/" so a request to the
+  // origin lands on the SPA. With no base the SPA already owns "/" — skip the
+  // redirect to avoid a self-loop.
+  if (base !== "") {
+    app.get("/", (c) => {
+      return c.html(`<meta http-equiv="refresh" content="0;url=${base}/">`);
+    });
+  }
 
   app.route(`${base}/api`, api);
   if (hasStaticAssets()) {

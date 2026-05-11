@@ -11,8 +11,10 @@ const APP_DISPLAY_NAME = process.env.APP_DISPLAY_NAME ?? "App";
 process.env.VITE_APP_NAME = APP_NAME;
 process.env.VITE_APP_DISPLAY_NAME = APP_DISPLAY_NAME;
 
-const basePath = process.env.BASE_PATH ?? `/${APP_NAME}`;
-const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
+// Mirror apps/api/src/config.ts: unset / empty means root ("/"); otherwise
+// normalise to "/<x>/" (trailing slash required by Vite's `base`).
+const trimmedBase = (process.env.BASE_PATH ?? "").replace(/^\/+|\/+$/g, "");
+const base = trimmedBase ? `/${trimmedBase}/` : "/";
 
 export default defineConfig({
   plugins: [

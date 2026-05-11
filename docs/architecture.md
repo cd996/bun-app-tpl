@@ -1,12 +1,12 @@
 # Architecture
 
-> Examples assume the default `BASE_PATH=/app`; substitute your own `BASE_PATH` if you have changed it.
+> Examples assume `BASE_PATH=/app`. The app is mounted at root (`/`) by default; set `BASE_PATH` to serve under a URL prefix.
 
 This is a Bun monorepo template that provides an OAuth-backed internal workspace for account management, policy tuples, documents, todos, settings, audit logs, encryption administration, and database backup.
 
 This document describes the implemented architecture in the current codebase. Planned integrations should live in separate roadmap or planning documents, not in current-state architecture docs.
 
-In examples below, `${BASE_PATH}` is the configured URL prefix (default `/app`, derived from `APP_NAME`).
+In examples below, `${BASE_PATH}` is the configured URL prefix. Empty by default — leave the placeholder as `""` when reading the routes for a root-mounted deploy.
 
 ## Runtime Shape
 
@@ -31,7 +31,7 @@ The outer app serves:
 
 | Mount | Purpose |
 |---|---|
-| `/` | HTML meta refresh to `${BASE_PATH}/`. |
+| `/` | HTML meta refresh to `${BASE_PATH}/` when `BASE_PATH` is set. Skipped when the app is root-mounted — the SPA already owns `/`. |
 | `${BASE_PATH}/api` | Hono API. |
 | `${BASE_PATH}/*` | Embedded SPA assets when production assets are present. |
 

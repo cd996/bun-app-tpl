@@ -1,7 +1,8 @@
 # Caddyfile for compose.yml in this directory.
 :80 {
-	# Application — mount under BASE_PATH (default /app, override via env).
-	# Caddy strips nothing; the API expects to see ${BASE_PATH}/api/* requests.
+	# Application — mounted under BASE_PATH=/app (set in .env.example to demo
+	# a reverse-proxy prefix; the app itself defaults to root). Caddy strips
+	# nothing; the API expects to see ${BASE_PATH}/api/* requests.
 	reverse_proxy /app/* app:3000 {
 		header_up Host {host}
 		header_up X-Forwarded-Proto {scheme}
