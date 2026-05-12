@@ -68,13 +68,19 @@
   "targetUser": "用户",
   "targetGroup": "用户组",
   "noShares": "尚未分享。",
+  "inheritedFrom": "继承自「{{title}}」",
+  "inheritedNotRemovable": "继承的分享只能在来源文档中移除",
   "sharedWithMe": "分享给我的",
-  "folder": "文件夹",
-  "allDocuments": "全部文档",
-  "unfiled": "未归档",
-  "newFolder": "新建文件夹",
-  "folderName": "文件夹名称",
-  "defaultFolder": "默认",
-  "deleteFolderTitle": "删除文件夹",
-  "deleteFolderConfirm": "确定要删除文件夹「{{name}}」吗？该文件夹下的文档将变为未归档状态。"
+  "tree": {
+    "newChild": "新建子文档",
+    "rename": "重命名",
+    "move": "移动…",
+    "moveTitle": "移动「{{title}}」",
+    "moveDescription": "选择一个新的上级文档。会形成循环引用的目标已禁用。",
+    "moveRoot": "顶层（无上级）",
+    "moveConfirm": "移动",
+    "movePickPlaceholder": "筛选…",
+    "expand": "展开",
+    "collapse": "折叠"
+  }
 }

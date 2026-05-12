@@ -232,3 +232,76 @@
   border-top: 1px solid var(--color-border);
   margin: 1rem 0;
 }
+
+/* ── Document detail page (Bear-style focused writing) ──
+   Activated by `data-doc-detail="true"` on the editor container so the
+   compact appearance survives unchanged in comments, todo notes, and any
+   other surface that mounts the same MarkdownEditor in dense layouts. */
+[data-doc-detail="true"] .md-editor {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+[data-doc-detail="true"] .md-editor [role="toolbar"] {
+  position: sticky;
+  top: 40px;
+  z-index: 10;
+  background: var(--color-background);
+  border: 0;
+  opacity: 0;
+  transition: opacity 150ms ease-in-out;
+  pointer-events: none;
+}
+[data-doc-detail="true"] .md-editor:focus-within [role="toolbar"],
+[data-doc-detail="true"] .md-editor:hover [role="toolbar"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+[data-doc-detail="true"] .md-editor .ProseMirror {
+  padding: 0;
+  font-size: 16px;
+  line-height: 1.7;
+}
+[data-doc-detail="true"] .md-editor-placeholder {
+  top: 0;
+  left: 0;
+  font-size: 16px;
+}
+[data-doc-detail="true"] .md-editor .ProseMirror h1 {
+  font-size: 1.75rem;
+  margin: 1.5rem 0 0.5rem;
+}
+[data-doc-detail="true"] .md-editor .ProseMirror h2 {
+  font-size: 1.4rem;
+  margin: 1.25rem 0 0.5rem;
+}
+[data-doc-detail="true"] .md-editor .ProseMirror h3 {
+  font-size: 1.15rem;
+  margin: 1rem 0 0.4rem;
+}
+[data-doc-detail="true"] .md-editor .ProseMirror p {
+  margin: 0 0 0.8rem 0;
+}
+[data-doc-detail="true"] .md-editor img,
+[data-doc-detail="true"] .md-editor table {
+  max-width: 100%;
+}
+[data-doc-detail="true"] .md-preview {
+  padding: 0;
+  font-size: 16px;
+  line-height: 1.7;
+}
+[data-doc-detail="true"] .md-preview h1,
+[data-doc-detail="true"] .md-preview h2,
+[data-doc-detail="true"] .md-preview h3,
+[data-doc-detail="true"] .md-preview h4,
+[data-doc-detail="true"] .md-preview h5,
+[data-doc-detail="true"] .md-preview h6,
+[data-doc-detail="true"] .md-editor .ProseMirror h1,
+[data-doc-detail="true"] .md-editor .ProseMirror h2,
+[data-doc-detail="true"] .md-editor .ProseMirror h3,
+[data-doc-detail="true"] .md-editor .ProseMirror h4,
+[data-doc-detail="true"] .md-editor .ProseMirror h5,
+[data-doc-detail="true"] .md-editor .ProseMirror h6 {
+  scroll-margin-top: 56px;
+}

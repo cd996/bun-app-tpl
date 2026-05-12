@@ -25,8 +25,11 @@ import { Route as AppAdminSettingsRouteImport } from './routes/_app/admin/settin
 import { Route as AppAdminPoliciesRouteImport } from './routes/_app/admin/policies'
 import { Route as AppAdminAuditRouteImport } from './routes/_app/admin/audit'
 import { Route as AppPortalTodosIndexRouteImport } from './routes/_app/portal/todos/index'
+import { Route as AppPortalDocumentsIndexRouteImport } from './routes/_app/portal/documents/index'
 import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/users/index'
 import { Route as AppPortalTodosTodoIdRouteImport } from './routes/_app/portal/todos/$todoId'
+import { Route as AppPortalDocumentsNewRouteImport } from './routes/_app/portal/documents/new'
+import { Route as AppPortalDocumentsDocIdRouteImport } from './routes/_app/portal/documents/$docId'
 import { Route as AppAdminUsersGroupsRouteImport } from './routes/_app/admin/users/groups'
 
 const UnlockRoute = UnlockRouteImport.update({
@@ -120,6 +123,13 @@ const AppPortalTodosIndexRoute = AppPortalTodosIndexRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_app/portal/todos/index.lazy').then((d) => d.Route),
 )
+const AppPortalDocumentsIndexRoute = AppPortalDocumentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppPortalDocumentsRoute,
+} as any).lazy(() =>
+  import('./routes/_app/portal/documents/index.lazy').then((d) => d.Route),
+)
 const AppAdminUsersIndexRoute = AppAdminUsersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -133,6 +143,20 @@ const AppPortalTodosTodoIdRoute = AppPortalTodosTodoIdRouteImport.update({
   getParentRoute: () => AppPortalTodosRoute,
 } as any).lazy(() =>
   import('./routes/_app/portal/todos/$todoId.lazy').then((d) => d.Route),
+)
+const AppPortalDocumentsNewRoute = AppPortalDocumentsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppPortalDocumentsRoute,
+} as any).lazy(() =>
+  import('./routes/_app/portal/documents/new.lazy').then((d) => d.Route),
+)
+const AppPortalDocumentsDocIdRoute = AppPortalDocumentsDocIdRouteImport.update({
+  id: '/$docId',
+  path: '/$docId',
+  getParentRoute: () => AppPortalDocumentsRoute,
+} as any).lazy(() =>
+  import('./routes/_app/portal/documents/$docId.lazy').then((d) => d.Route),
 )
 const AppAdminUsersGroupsRoute = AppAdminUsersGroupsRouteImport.update({
   id: '/groups',
@@ -154,12 +178,15 @@ export interface FileRoutesByFullPath {
   '/admin/policies': typeof AppAdminPoliciesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRouteWithChildren
-  '/portal/documents': typeof AppPortalDocumentsRoute
+  '/portal/documents': typeof AppPortalDocumentsRouteWithChildren
   '/portal/todos': typeof AppPortalTodosRouteWithChildren
   '/portal/': typeof AppPortalIndexRoute
   '/admin/users/groups': typeof AppAdminUsersGroupsRoute
+  '/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
+  '/portal/documents/new': typeof AppPortalDocumentsNewRoute
   '/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
   '/admin/users/': typeof AppAdminUsersIndexRoute
+  '/portal/documents/': typeof AppPortalDocumentsIndexRoute
   '/portal/todos/': typeof AppPortalTodosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -173,11 +200,13 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/policies': typeof AppAdminPoliciesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
-  '/portal/documents': typeof AppPortalDocumentsRoute
   '/portal': typeof AppPortalIndexRoute
   '/admin/users/groups': typeof AppAdminUsersGroupsRoute
+  '/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
+  '/portal/documents/new': typeof AppPortalDocumentsNewRoute
   '/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
   '/admin/users': typeof AppAdminUsersIndexRoute
+  '/portal/documents': typeof AppPortalDocumentsIndexRoute
   '/portal/todos': typeof AppPortalTodosIndexRoute
 }
 export interface FileRoutesById {
@@ -194,12 +223,15 @@ export interface FileRoutesById {
   '/_app/admin/policies': typeof AppAdminPoliciesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRouteWithChildren
-  '/_app/portal/documents': typeof AppPortalDocumentsRoute
+  '/_app/portal/documents': typeof AppPortalDocumentsRouteWithChildren
   '/_app/portal/todos': typeof AppPortalTodosRouteWithChildren
   '/_app/portal/': typeof AppPortalIndexRoute
   '/_app/admin/users/groups': typeof AppAdminUsersGroupsRoute
+  '/_app/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
+  '/_app/portal/documents/new': typeof AppPortalDocumentsNewRoute
   '/_app/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
   '/_app/admin/users/': typeof AppAdminUsersIndexRoute
+  '/_app/portal/documents/': typeof AppPortalDocumentsIndexRoute
   '/_app/portal/todos/': typeof AppPortalTodosIndexRoute
 }
 export interface FileRouteTypes {
@@ -220,8 +252,11 @@ export interface FileRouteTypes {
     | '/portal/todos'
     | '/portal/'
     | '/admin/users/groups'
+    | '/portal/documents/$docId'
+    | '/portal/documents/new'
     | '/portal/todos/$todoId'
     | '/admin/users/'
+    | '/portal/documents/'
     | '/portal/todos/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -235,11 +270,13 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/policies'
     | '/admin/settings'
-    | '/portal/documents'
     | '/portal'
     | '/admin/users/groups'
+    | '/portal/documents/$docId'
+    | '/portal/documents/new'
     | '/portal/todos/$todoId'
     | '/admin/users'
+    | '/portal/documents'
     | '/portal/todos'
   id:
     | '__root__'
@@ -259,8 +296,11 @@ export interface FileRouteTypes {
     | '/_app/portal/todos'
     | '/_app/portal/'
     | '/_app/admin/users/groups'
+    | '/_app/portal/documents/$docId'
+    | '/_app/portal/documents/new'
     | '/_app/portal/todos/$todoId'
     | '/_app/admin/users/'
+    | '/_app/portal/documents/'
     | '/_app/portal/todos/'
   fileRoutesById: FileRoutesById
 }
@@ -388,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPortalTodosIndexRouteImport
       parentRoute: typeof AppPortalTodosRoute
     }
+    '/_app/portal/documents/': {
+      id: '/_app/portal/documents/'
+      path: '/'
+      fullPath: '/portal/documents/'
+      preLoaderRoute: typeof AppPortalDocumentsIndexRouteImport
+      parentRoute: typeof AppPortalDocumentsRoute
+    }
     '/_app/admin/users/': {
       id: '/_app/admin/users/'
       path: '/'
@@ -401,6 +448,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/portal/todos/$todoId'
       preLoaderRoute: typeof AppPortalTodosTodoIdRouteImport
       parentRoute: typeof AppPortalTodosRoute
+    }
+    '/_app/portal/documents/new': {
+      id: '/_app/portal/documents/new'
+      path: '/new'
+      fullPath: '/portal/documents/new'
+      preLoaderRoute: typeof AppPortalDocumentsNewRouteImport
+      parentRoute: typeof AppPortalDocumentsRoute
+    }
+    '/_app/portal/documents/$docId': {
+      id: '/_app/portal/documents/$docId'
+      path: '/$docId'
+      fullPath: '/portal/documents/$docId'
+      preLoaderRoute: typeof AppPortalDocumentsDocIdRouteImport
+      parentRoute: typeof AppPortalDocumentsRoute
     }
     '/_app/admin/users/groups': {
       id: '/_app/admin/users/groups'
@@ -444,6 +505,21 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
   AppAdminRouteChildren,
 )
 
+interface AppPortalDocumentsRouteChildren {
+  AppPortalDocumentsDocIdRoute: typeof AppPortalDocumentsDocIdRoute
+  AppPortalDocumentsNewRoute: typeof AppPortalDocumentsNewRoute
+  AppPortalDocumentsIndexRoute: typeof AppPortalDocumentsIndexRoute
+}
+
+const AppPortalDocumentsRouteChildren: AppPortalDocumentsRouteChildren = {
+  AppPortalDocumentsDocIdRoute: AppPortalDocumentsDocIdRoute,
+  AppPortalDocumentsNewRoute: AppPortalDocumentsNewRoute,
+  AppPortalDocumentsIndexRoute: AppPortalDocumentsIndexRoute,
+}
+
+const AppPortalDocumentsRouteWithChildren =
+  AppPortalDocumentsRoute._addFileChildren(AppPortalDocumentsRouteChildren)
+
 interface AppPortalTodosRouteChildren {
   AppPortalTodosTodoIdRoute: typeof AppPortalTodosTodoIdRoute
   AppPortalTodosIndexRoute: typeof AppPortalTodosIndexRoute
@@ -460,14 +536,14 @@ const AppPortalTodosRouteWithChildren = AppPortalTodosRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRouteWithChildren
-  AppPortalDocumentsRoute: typeof AppPortalDocumentsRoute
+  AppPortalDocumentsRoute: typeof AppPortalDocumentsRouteWithChildren
   AppPortalTodosRoute: typeof AppPortalTodosRouteWithChildren
   AppPortalIndexRoute: typeof AppPortalIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRouteWithChildren,
-  AppPortalDocumentsRoute: AppPortalDocumentsRoute,
+  AppPortalDocumentsRoute: AppPortalDocumentsRouteWithChildren,
   AppPortalTodosRoute: AppPortalTodosRouteWithChildren,
   AppPortalIndexRoute: AppPortalIndexRoute,
 }

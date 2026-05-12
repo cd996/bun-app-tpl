@@ -68,13 +68,19 @@
   "targetUser": "User",
   "targetGroup": "Group",
   "noShares": "No shares yet.",
+  "inheritedFrom": "Inherited from \"{{title}}\"",
+  "inheritedNotRemovable": "Inherited shares can only be removed from the source document",
   "sharedWithMe": "Shared with me",
-  "folder": "Folder",
-  "allDocuments": "All Documents",
-  "unfiled": "Unfiled",
-  "newFolder": "New Folder",
-  "folderName": "Folder name",
-  "defaultFolder": "Default",
-  "deleteFolderTitle": "Delete Folder",
-  "deleteFolderConfirm": "Are you sure you want to delete the folder \"{{name}}\"? Documents in this folder will become unfiled."
+  "tree": {
+    "newChild": "New child",
+    "rename": "Rename",
+    "move": "Move…",
+    "moveTitle": "Move \"{{title}}\"",
+    "moveDescription": "Pick a new parent. Targets that would create a cycle are disabled.",
+    "moveRoot": "Top level (no parent)",
+    "moveConfirm": "Move",
+    "movePickPlaceholder": "Filter…",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  }
 }

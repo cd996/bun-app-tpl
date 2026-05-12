@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { customAlphabet } from "nanoid";
 import { createDb } from "@/db";
 import { users } from "@/modules/account/users/schema";
-import { documentAttachments, documentFolders, documents } from "@/modules/document/schema";
+import { documentAttachments, documents } from "@/modules/document/schema";
 import { AppError } from "@/shared/lib/errors";
 import { assertWithinTotalQuota, getUploadsUsedBytes, isWithinFileSize, MAX_UPLOAD_BYTES } from "./upload-limits";
 
@@ -27,7 +27,6 @@ afterEach(() => {
 
 async function seedDocAttachment(size: number) {
   const userId = nanoid();
-  const folderId = nanoid();
   const docId = nanoid();
   const now = new Date().toISOString();
 
@@ -41,17 +40,8 @@ async function seedDocAttachment(size: number) {
     updatedAt: now,
   }).run();
 
-  await db.insert(documentFolders).values({
-    id: folderId,
-    name: "f",
-    creatorId: userId,
-    createdAt: now,
-    updatedAt: now,
-  }).run();
-
   await db.insert(documents).values({
     id: docId,
-    folderId,
     title: "t",
     creatorId: userId,
     createdAt: now,

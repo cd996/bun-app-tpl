@@ -20,7 +20,7 @@ bun run dev:dex            # starts the bundled dex IdP only
 bun run dev                # starts web + api, reads OAUTH_* from .env
 ```
 
-Open the URL printed by `bun run dev` (e.g. `http://app.localhost:3355`) — you'll be redirected to the setup flow, then to login. Use `admin@test.io` / `admin` to sign in (configured in the bundled dex). The first matching login becomes admin per `DEFAULT_ADMIN`.
+Open the URL printed by `bun run dev` (e.g. `http://app.localhost:3355`) — you'll be redirected to the setup flow, then to login. Use `admin@zzci.cc` / `zzci` to sign in (configured in the bundled dex). The first matching login becomes admin per `DEFAULT_ADMIN`.
 
 If you have your own OAuth/OIDC provider, point `OAUTH_*` in `.env` at it and skip `dev:dex` entirely. The dex script only manages the IdP — the app's OAuth credentials always come from `.env`.
 

@@ -25,48 +25,47 @@ import {
 import {
   addDocumentShare,
   createDocument,
-  createFolder,
   deleteDocument,
-  deleteFolder,
   getDocumentById,
   getDocumentPermission,
   getDocumentShareById,
-  getFolderById,
-  getFolderByName,
+  getDocumentTreeForUser,
+  isVersionConflict,
   listActiveUsers,
   listAllGroups,
   listAllTags,
+  listDescendantIds,
   listDocuments,
-  listDocumentShares,
-  listFolders,
+  listDocumentSharesWithInheritance,
   listMyDocuments,
+  moveDocument,
   removeDocumentShare,
   updateDocument,
-  updateFolder,
 } from "./document.service";
 
 const tagSchema = z.string().min(1).max(50).regex(/^[\w-]+$/);
-
-// Folder names render in headings, breadcrumbs, and audit logs. Reject
-// control chars, RTL overrides, zero-width and other format codepoints
-// that can be used for spoofing without contributing legible content.
-// Letters / numbers / spaces / `._-` / common CJK punctuation are allowed.
-const RE_FOLDER_NAME = /^[\p{L}\p{N}\p{Mn}\p{Mc} ._\-()[\]&,'!?+。，、！？（）【】「」]+$/u;
 
 const createSchema = z.object({
   title: z.string().min(1).max(500),
   content: z.string().max(50000).optional(),
   tags: z.array(tagSchema).max(20).optional(),
-  folderId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
 });
 
 const updateSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   content: z.string().max(50000).optional(),
   tags: z.array(tagSchema).max(20).optional(),
-  folderId: z.string().nullable().optional(),
-}).refine(d => Object.values(d).some(v => v !== undefined), {
-  message: "At least one field must be provided",
+  parentId: z.string().nullable().optional(),
+  // Required for optimistic concurrency. Clients send the version they last
+  // observed; a mismatch returns 409 so auto-save doesn't silently clobber.
+  version: z.number().int().nonnegative(),
+}).refine(d => Object.entries(d).some(([k, v]) => k !== "version" && v !== undefined), {
+  message: "At least one mutable field must be provided",
+});
+
+const moveSchema = z.object({
+  parentId: z.string().nullable(),
 });
 
 function auditMeta(c: Context) {
@@ -100,6 +99,28 @@ function assertOwnerOrAdmin(user: { id: string; role: string }, doc: { creatorId
     throw new ForbiddenError();
 }
 
+async function assertMoveTargetAllowed(
+  db: Parameters<typeof getDocumentById>[0],
+  user: { id: string; role: string },
+  movingId: string,
+  targetParentId: string | null,
+) {
+  if (targetParentId === null)
+    return;
+  if (targetParentId === movingId)
+    throw new AppError("A document cannot be its own parent", 400, "INVALID_MOVE");
+
+  const target = await getDocumentById(db, targetParentId);
+  if (!target)
+    throw new NotFoundError("Document", targetParentId);
+  await assertAccess(db, user, target, "editor");
+
+  const descendants = await listDescendantIds(db, movingId);
+  if (descendants.includes(targetParentId)) {
+    throw new AppError("Cannot move a document under its own descendant", 400, "INVALID_MOVE");
+  }
+}
+
 export function documentRoutes() {
   const router = new OpenAPIHono<AppEnv>();
 
@@ -111,21 +132,29 @@ export function documentRoutes() {
     const user = c.get("user")!;
     const q = c.req.query("q");
     const tag = c.req.query("tag");
-    const folderId = c.req.query("folder_id");
     const creatorId = c.req.query("creator_id");
     const page = Math.max(1, Math.floor(Number.parseInt(c.req.query("page") ?? "", 10)) || 1);
     const limit = Math.min(100, Math.max(1, Math.floor(Number.parseInt(c.req.query("limit") ?? "", 10)) || 20));
 
     const isAdmin = user.role === "admin";
     const result = isAdmin
-      ? await listDocuments(db, { q, tag, folderId, creatorId, page, limit })
-      : await listMyDocuments(db, { userId: user.id, q, tag, folderId, page, limit });
+      ? await listDocuments(db, { q, tag, creatorId, page, limit })
+      : await listMyDocuments(db, { userId: user.id, q, tag, page, limit });
 
     return c.json({
       success: true,
       data: result.data,
       meta: { total: result.total, page, limit },
     });
+  });
+
+  // GET /documents/tree — every doc the caller can read, flat-with-parentId.
+  // The frontend assembles the tree; payload stays light (no content/tags).
+  router.get("/documents/tree", async (c) => {
+    const db = c.get("db");
+    const user = c.get("user")!;
+    const data = await getDocumentTreeForUser(db, user);
+    return c.json({ success: true, data });
   });
 
   // GET /documents/tags — list all unique tags
@@ -171,65 +200,6 @@ export function documentRoutes() {
     return c.json({ success: true, data: doc }, 201);
   });
 
-  // ── Folder endpoints ──
-
-  const folderSchema = z.object({
-    name: z.string().min(1).max(200).refine(v => RE_FOLDER_NAME.test(v), {
-      message: "Folder name contains disallowed characters",
-    }),
-  });
-
-  router.get("/documents/folders", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const isAdmin = user.role === "admin";
-    const data = isAdmin ? await listFolders(db) : await listFolders(db, user.id);
-    return c.json({ success: true, data });
-  });
-
-  router.post("/documents/folders", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const body = folderSchema.parse(await c.req.json());
-    const duplicate = await getFolderByName(db, body.name);
-    if (duplicate)
-      throw new AppError(`Folder name "${body.name}" already exists`, 409, "CONFLICT");
-    const folder = await createFolder(db, { name: body.name, creatorId: user.id });
-    return c.json({ success: true, data: folder }, 201);
-  });
-
-  router.patch("/documents/folders/:fid", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const fid = c.req.param("fid");
-    const existing = await getFolderById(db, fid);
-    if (!existing)
-      throw new NotFoundError("Folder", fid);
-    if (user.role !== "admin" && existing.creatorId !== user.id)
-      throw new ForbiddenError();
-    const body = folderSchema.parse(await c.req.json());
-    if (body.name !== existing.name) {
-      const duplicate = await getFolderByName(db, body.name);
-      if (duplicate)
-        throw new AppError(`Folder name "${body.name}" already exists`, 409, "CONFLICT");
-    }
-    const updated = await updateFolder(db, fid, body);
-    return c.json({ success: true, data: updated });
-  });
-
-  router.delete("/documents/folders/:fid", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const fid = c.req.param("fid");
-    const existing = await getFolderById(db, fid);
-    if (!existing)
-      throw new NotFoundError("Folder", fid);
-    if (user.role !== "admin" && existing.creatorId !== user.id)
-      throw new ForbiddenError();
-    await deleteFolder(db, fid);
-    return c.json({ success: true, data: null });
-  });
-
   // GET /documents/:id — detail
   router.get("/documents/:id", async (c) => {
     const db = c.get("db");
@@ -241,7 +211,10 @@ export function documentRoutes() {
     return c.json({ success: true, data: doc });
   });
 
-  // PATCH /documents/:id — update (creator or admin)
+  // PATCH /documents/:id — update (creator or admin/editor). `version` is
+  // required (optimistic concurrency); mismatch returns 409 with the current
+  // row so the caller can reconcile. If `parentId` is being moved, the target
+  // is validated the same way as PATCH /documents/:id/move.
   router.patch("/documents/:id", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -252,7 +225,19 @@ export function documentRoutes() {
     await assertAccess(db, user, existing, "editor");
 
     const body = updateSchema.parse(await c.req.json());
-    const updated = await updateDocument(db, id, body);
+
+    if (body.parentId !== undefined && body.parentId !== existing.parentId) {
+      await assertMoveTargetAllowed(db, user, id, body.parentId);
+    }
+
+    const { version: expectedVersion, ...rest } = body;
+    const updated = await updateDocument(db, id, { ...rest, expectedVersion });
+    if (isVersionConflict(updated)) {
+      return c.json(
+        { success: false, error: { code: "VERSION_CONFLICT", message: "Document was modified by another writer" }, data: updated.current },
+        409,
+      );
+    }
 
     await audit(db, {
       actorId: user.id,
@@ -268,6 +253,37 @@ export function documentRoutes() {
     return c.json({ success: true, data: updated });
   });
 
+  // PATCH /documents/:id/move — re-parent a document. Validates target exists,
+  // caller can edit it, and the move would not introduce a cycle.
+  router.patch("/documents/:id/move", async (c) => {
+    const db = c.get("db");
+    const user = c.get("user")!;
+    const id = c.req.param("id");
+    const existing = await getDocumentById(db, id);
+    if (!existing)
+      throw new NotFoundError("Document", id);
+    await assertAccess(db, user, existing, "editor");
+
+    const body = moveSchema.parse(await c.req.json());
+    await assertMoveTargetAllowed(db, user, id, body.parentId);
+
+    const moved = await moveDocument(db, id, body.parentId);
+
+    await audit(db, {
+      actorId: user.id,
+      actorName: user.name,
+      action: "document.updated",
+      resourceType: "document",
+      resourceId: id,
+      resourceName: existing.title,
+      detail: { moved: { from: existing.parentId, to: body.parentId } },
+      ...auditMeta(c),
+      result: "success",
+    });
+
+    return c.json({ success: true, data: moved });
+  });
+
   // DELETE /documents/:id — delete (creator or admin)
   router.delete("/documents/:id", async (c) => {
     const db = c.get("db");
@@ -281,7 +297,16 @@ export function documentRoutes() {
       throw new ForbiddenError();
     }
 
+    // Capture descendants before the cascade so we can emit one audit event
+    // per dropped document — the FK cascade deletes them silently otherwise.
+    const descendantIds = await listDescendantIds(db, id);
+    const descendants = descendantIds.length > 0
+      ? await Promise.all(descendantIds.map(d => getDocumentById(db, d)))
+      : [];
+
     await deleteDocument(db, id);
+
+    const meta = auditMeta(c);
     await audit(db, {
       actorId: user.id,
       actorName: user.name,
@@ -289,9 +314,24 @@ export function documentRoutes() {
       resourceType: "document",
       resourceId: id,
       resourceName: existing.title,
-      ...auditMeta(c),
+      ...meta,
       result: "success",
     });
+    for (const d of descendants) {
+      if (!d)
+        continue;
+      await audit(db, {
+        actorId: user.id,
+        actorName: user.name,
+        action: "document.deleted",
+        resourceType: "document",
+        resourceId: d.id,
+        resourceName: d.title,
+        detail: { cascadedFrom: id },
+        ...meta,
+        result: "success",
+      });
+    }
     return c.json({ success: true, data: null });
   });
 
@@ -505,7 +545,11 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     assertOwnerOrAdmin(user, doc);
-    const data = await listDocumentShares(db, id);
+    // Response includes inherited shares — each row carries `inheritedFrom`
+    // (`null` for shares on this doc, `{ id, title }` for shares applied
+    // through an ancestor). UI uses this to render inherited grants as
+    // non-removable.
+    const data = await listDocumentSharesWithInheritance(db, id);
     return c.json({ success: true, data });
   });
 
@@ -533,7 +577,17 @@ export function documentRoutes() {
       result: "success",
     });
 
-    return c.json({ success: true, data: share }, 201);
+    // Shares cascade to descendants; the caller (and UI) should be aware
+    // that adding a grant here also grants the same access on every nested
+    // document under `:id`.
+    return c.json(
+      {
+        success: true,
+        data: share,
+        note: "Share applies recursively to all descendant documents.",
+      },
+      201,
+    );
   });
 
   router.delete("/documents/:id/shares/:shareId", async (c) => {

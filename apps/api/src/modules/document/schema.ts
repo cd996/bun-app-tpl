@@ -1,28 +1,20 @@
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { users } from "@/modules/account/users/schema";
-
-export const documentFolders = sqliteTable("document_folders", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  creatorId: text("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
-  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()).$onUpdateFn(() => new Date().toISOString()),
-}, t => [
-  index("idx_doc_folders_creator").on(t.creatorId),
-]);
 
 export const documents = sqliteTable("documents", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   content: text("content"),
   tags: text("tags").notNull().default("[]"),
-  folderId: text("folder_id").references(() => documentFolders.id, { onDelete: "set null" }),
+  parentId: text("parent_id").references((): AnySQLiteColumn => documents.id, { onDelete: "cascade" }),
+  version: integer("version").notNull().default(1),
   creatorId: text("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()).$onUpdateFn(() => new Date().toISOString()),
 }, t => [
   index("idx_documents_creator").on(t.creatorId),
-  index("idx_documents_folder").on(t.folderId),
+  index("idx_documents_parent").on(t.parentId),
 ]);
 
 export const documentAttachments = sqliteTable("document_attachments", {

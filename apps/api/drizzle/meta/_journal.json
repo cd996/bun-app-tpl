@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1776603633016,
-      "tag": "0000_dashing_darkhawk",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1778716800000,
-      "tag": "0001_totp_last_used_timestep",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1778716900000,
-      "tag": "0002_audit_compound_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1778717000000,
-      "tag": "0003_tuples_membership_index",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1778717100000,
-      "tag": "0004_documents_todos_fts5",
+      "when": 1778560935781,
+      "tag": "0000_gray_shooting_star",
       "breakpoints": true
     }
   ]
