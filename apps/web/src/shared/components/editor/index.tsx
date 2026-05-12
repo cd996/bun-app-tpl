@@ -2,18 +2,18 @@
 //
 // `readOnly` paths render via `markdown-preview` (react-markdown + Shiki —
 // lightweight, no contenteditable footprint); editable paths mount the
-// Lexical-based WYSIWYG editor that round-trips through the markdown
-// transformers from `@lexical/markdown`. Both are React.lazy so the
-// route-shell stays small for users that never open one.
+// Milkdown-based WYSIWYG editor that round-trips markdown via its built-in
+// remark serialiser. Both are React.lazy so the route-shell stays small
+// for users that never open one.
 //
-// External shape is unchanged from the previous textarea-based editor;
-// callers in documents / todos do not need to migrate.
+// External shape is unchanged from earlier editor revisions; callers in
+// documents / todos do not need to migrate.
 
 import type { ComponentProps } from "react";
 import { lazy, Suspense } from "react";
 
 const LazyMarkdownPreview = lazy(() => import("./markdown-preview"));
-const LazyLexicalEditor = lazy(() => import("./lexical-editor"));
+const LazyMilkdownEditor = lazy(() => import("./milkdown-editor"));
 
 interface MarkdownEditorProps {
   readonly value?: string | undefined;
@@ -38,9 +38,9 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       </Suspense>
     );
   }
-  // Drop `readOnly` from the editor props — Lexical mode is always editable.
-  // Forward the rest 1:1.
-  const editorProps: ComponentProps<typeof LazyLexicalEditor> = {
+  // Drop `readOnly` from the editor props — the WYSIWYG mode is always
+  // editable. Forward the rest 1:1.
+  const editorProps: ComponentProps<typeof LazyMilkdownEditor> = {
     value: props.value,
     defaultValue: props.defaultValue,
     onChange: props.onChange,
@@ -51,7 +51,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
   };
   return (
     <Suspense fallback={<Fallback />}>
-      <LazyLexicalEditor {...editorProps} />
+      <LazyMilkdownEditor {...editorProps} />
     </Suspense>
   );
 }

@@ -1,6 +1,8 @@
 {
   "searchPlaceholder": "按名称、邮箱或用户名搜索...",
   "allRoles": "所有角色",
+  "roleAdmin": "管理员",
+  "roleUser": "普通用户",
   "allStatuses": "所有状态",
   "totalCount": "{{count}} 个用户",
   "noResults": "未找到用户。",

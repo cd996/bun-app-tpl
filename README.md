@@ -11,13 +11,18 @@ A Bun monorepo template for OAuth-backed internal workspaces. Ships with:
 
 ```bash
 bun install
-cp .env.example .env
-bun run dev:dex     # starts the dev server + a bundled dex IdP
+cp .env.example .env       # uncomment the "Bundled dex IdP" block
+
+# terminal 1
+bun run dev:dex            # starts the bundled dex IdP only
+
+# terminal 2
+bun run dev                # starts web + api, reads OAUTH_* from .env
 ```
 
-Open http://localhost:3000 — you'll be redirected to the setup flow, then to login. Use `admin@example.com` / `admin` to sign in (configured in the bundled dex). The first matching login becomes admin per `DEFAULT_ADMIN`.
+Open the URL printed by `bun run dev` (e.g. `http://app.localhost:3355`) — you'll be redirected to the setup flow, then to login. Use `admin@test.io` / `admin` to sign in (configured in the bundled dex). The first matching login becomes admin per `DEFAULT_ADMIN`.
 
-If you have your own OAuth/OIDC provider, set `OAUTH_*` in `.env` and run `bun run dev` instead. The bundled dex runs on `:5567` and can be left disabled.
+If you have your own OAuth/OIDC provider, point `OAUTH_*` in `.env` at it and skip `dev:dex` entirely. The dex script only manages the IdP — the app's OAuth credentials always come from `.env`.
 
 ### First-run setup
 
