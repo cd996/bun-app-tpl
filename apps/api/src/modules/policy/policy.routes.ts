@@ -1,5 +1,5 @@
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { z } from "zod";
 import { listGroups } from "@/modules/account/groups/groups.service";
 import { listUsers } from "@/modules/account/users/users.service";
@@ -55,7 +55,7 @@ const batchSchema = z.object({
 });
 
 export function policyRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   // GET /policy/tuples — list relation tuples (admin)
   router.get("/policy/tuples", authRequired, adminRequired, async (c) => {

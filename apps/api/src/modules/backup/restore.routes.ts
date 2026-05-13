@@ -1,5 +1,5 @@
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { deleteUserSessions } from "@/modules/account/auth/auth.service";
 import { users } from "@/modules/account/users/schema";
 import { audit } from "@/modules/audit/audit.service";
@@ -84,7 +84,7 @@ function stripUserTables<T extends { tables: Record<string, unknown[]>; modules:
 }
 
 export function backupImportRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   router.use("*", authRequired);
 

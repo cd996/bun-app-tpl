@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "207b683e-245b-4455-8351-a64a4d41d599",
+  "id": "92c8e8e7-c531-43bf-ae58-20631f842404",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "pkce_challenges": {
@@ -660,314 +660,13 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "document_attachments": {
-      "name": "document_attachments",
+    "document_details": {
+      "name": "document_details",
       "columns": {
-        "id": {
-          "name": "id",
+        "item_id": {
+          "name": "item_id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filename": {
-          "name": "filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filepath": {
-          "name": "filepath",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mimetype": {
-          "name": "mimetype",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "uploaded_by": {
-          "name": "uploaded_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_document_attachments_doc": {
-          "name": "idx_document_attachments_doc",
-          "columns": [
-            "document_id"
-          ],
-          "isUnique": false
-        },
-        "idx_document_attachments_uploader": {
-          "name": "idx_document_attachments_uploader",
-          "columns": [
-            "uploaded_by"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "document_attachments_document_id_documents_id_fk": {
-          "name": "document_attachments_document_id_documents_id_fk",
-          "tableFrom": "document_attachments",
-          "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "document_attachments_uploaded_by_users_id_fk": {
-          "name": "document_attachments_uploaded_by_users_id_fk",
-          "tableFrom": "document_attachments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "uploaded_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "document_comments": {
-      "name": "document_comments",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_document_comments_doc": {
-          "name": "idx_document_comments_doc",
-          "columns": [
-            "document_id"
-          ],
-          "isUnique": false
-        },
-        "idx_document_comments_author": {
-          "name": "idx_document_comments_author",
-          "columns": [
-            "author_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "document_comments_document_id_documents_id_fk": {
-          "name": "document_comments_document_id_documents_id_fk",
-          "tableFrom": "document_comments",
-          "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "document_comments_author_id_users_id_fk": {
-          "name": "document_comments_author_id_users_id_fk",
-          "tableFrom": "document_comments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "document_shares": {
-      "name": "document_shares",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_type": {
-          "name": "target_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "permission": {
-          "name": "permission",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'viewer'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_doc_shares_unique": {
-          "name": "idx_doc_shares_unique",
-          "columns": [
-            "document_id",
-            "target_type",
-            "target_id"
-          ],
-          "isUnique": true
-        },
-        "idx_doc_shares_doc": {
-          "name": "idx_doc_shares_doc",
-          "columns": [
-            "document_id"
-          ],
-          "isUnique": false
-        },
-        "idx_doc_shares_target": {
-          "name": "idx_doc_shares_target",
-          "columns": [
-            "target_type",
-            "target_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "document_shares_document_id_documents_id_fk": {
-          "name": "document_shares_document_id_documents_id_fk",
-          "tableFrom": "document_shares",
-          "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "documents": {
-      "name": "documents",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -993,20 +692,385 @@
           "notNull": false,
           "autoincrement": false
         },
-        "version": {
-          "name": "version",
+        "comments_locked": {
+          "name": "comments_locked",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 1
+          "default": false
+        }
+      },
+      "indexes": {
+        "idx_document_details_parent": {
+          "name": "idx_document_details_parent",
+          "columns": [
+            "parent_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "document_details_item_id_items_id_fk": {
+          "name": "document_details_item_id_items_id_fk",
+          "tableFrom": "document_details",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
-        "creator_id": {
-          "name": "creator_id",
+        "document_details_parent_id_items_id_fk": {
+          "name": "document_details_parent_id_items_id_fk",
+          "tableFrom": "document_details",
+          "tableTo": "items",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "file_references": {
+      "name": "file_references",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_id": {
+          "name": "file_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "owner_type": {
+          "name": "owner_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "filename": {
+          "name": "filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_file_refs_unique": {
+          "name": "idx_file_refs_unique",
+          "columns": [
+            "owner_type",
+            "owner_id",
+            "file_id"
+          ],
+          "isUnique": true
+        },
+        "idx_file_refs_owner": {
+          "name": "idx_file_refs_owner",
+          "columns": [
+            "owner_type",
+            "owner_id"
+          ],
+          "isUnique": false
+        },
+        "idx_file_refs_file": {
+          "name": "idx_file_refs_file",
+          "columns": [
+            "file_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "file_references_file_id_files_id_fk": {
+          "name": "file_references_file_id_files_id_fk",
+          "tableFrom": "file_references",
+          "tableTo": "files",
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "file_references_created_by_users_id_fk": {
+          "name": "file_references_created_by_users_id_fk",
+          "tableFrom": "file_references",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "files": {
+      "name": "files",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mimetype": {
+          "name": "mimetype",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storage_driver": {
+          "name": "storage_driver",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ref_count": {
+          "name": "ref_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_files_sha_driver": {
+          "name": "idx_files_sha_driver",
+          "columns": [
+            "sha256",
+            "storage_driver"
+          ],
+          "isUnique": true
+        },
+        "idx_files_sha": {
+          "name": "idx_files_sha",
+          "columns": [
+            "sha256"
+          ],
+          "isUnique": false
+        },
+        "idx_files_driver": {
+          "name": "idx_files_driver",
+          "columns": [
+            "storage_driver"
+          ],
+          "isUnique": false
+        },
+        "idx_files_unreferenced": {
+          "name": "idx_files_unreferenced",
+          "columns": [
+            "id"
+          ],
+          "isUnique": false,
+          "where": "ref_count = 0"
+        }
+      },
+      "foreignKeys": {
+        "files_uploaded_by_users_id_fk": {
+          "name": "files_uploaded_by_users_id_fk",
+          "tableFrom": "files",
+          "tableTo": "users",
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "issue_details": {
+      "name": "issue_details",
+      "columns": {
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'medium'"
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "issue_details_item_id_items_id_fk": {
+          "name": "issue_details_item_id_items_id_fk",
+          "tableFrom": "issue_details",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "item_comments": {
+      "name": "item_comments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reply_to_id": {
+          "name": "reply_to_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_internal": {
+          "name": "is_internal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -1024,28 +1088,36 @@
         }
       },
       "indexes": {
-        "idx_documents_creator": {
-          "name": "idx_documents_creator",
+        "idx_item_comments_item": {
+          "name": "idx_item_comments_item",
           "columns": [
-            "creator_id"
+            "item_id",
+            "created_at"
           ],
           "isUnique": false
         },
-        "idx_documents_parent": {
-          "name": "idx_documents_parent",
+        "idx_item_comments_author": {
+          "name": "idx_item_comments_author",
           "columns": [
-            "parent_id"
+            "author_id"
+          ],
+          "isUnique": false
+        },
+        "idx_item_comments_reply": {
+          "name": "idx_item_comments_reply",
+          "columns": [
+            "reply_to_id"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "documents_parent_id_documents_id_fk": {
-          "name": "documents_parent_id_documents_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "documents",
+        "item_comments_item_id_items_id_fk": {
+          "name": "item_comments_item_id_items_id_fk",
+          "tableFrom": "item_comments",
+          "tableTo": "items",
           "columnsFrom": [
-            "parent_id"
+            "item_id"
           ],
           "columnsTo": [
             "id"
@@ -1053,9 +1125,143 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "documents_creator_id_users_id_fk": {
-          "name": "documents_creator_id_users_id_fk",
-          "tableFrom": "documents",
+        "item_comments_author_id_users_id_fk": {
+          "name": "item_comments_author_id_users_id_fk",
+          "tableFrom": "item_comments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "item_comments_reply_to_id_item_comments_id_fk": {
+          "name": "item_comments_reply_to_id_item_comments_id_fk",
+          "tableFrom": "item_comments",
+          "tableTo": "item_comments",
+          "columnsFrom": [
+            "reply_to_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "items": {
+      "name": "items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "short_id": {
+          "name": "short_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_items_short_id": {
+          "name": "idx_items_short_id",
+          "columns": [
+            "short_id"
+          ],
+          "isUnique": true
+        },
+        "idx_items_type_deleted": {
+          "name": "idx_items_type_deleted",
+          "columns": [
+            "type",
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "idx_items_creator_deleted": {
+          "name": "idx_items_creator_deleted",
+          "columns": [
+            "creator_id",
+            "deleted_at"
+          ],
+          "isUnique": false
+        },
+        "idx_items_type_status_deleted": {
+          "name": "idx_items_type_status_deleted",
+          "columns": [
+            "type",
+            "status",
+            "deleted_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "items_creator_id_users_id_fk": {
+          "name": "items_creator_id_users_id_fk",
+          "tableFrom": "items",
           "tableTo": "users",
           "columnsFrom": [
             "creator_id"
@@ -1229,339 +1435,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_attachments": {
-      "name": "todo_attachments",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filename": {
-          "name": "filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "filepath": {
-          "name": "filepath",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mimetype": {
-          "name": "mimetype",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "uploaded_by": {
-          "name": "uploaded_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_todo_attachments_todo": {
-          "name": "idx_todo_attachments_todo",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todo_attachments_uploader": {
-          "name": "idx_todo_attachments_uploader",
-          "columns": [
-            "uploaded_by"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_attachments_todo_id_todos_id_fk": {
-          "name": "todo_attachments_todo_id_todos_id_fk",
-          "tableFrom": "todo_attachments",
-          "tableTo": "todos",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "todo_attachments_uploaded_by_users_id_fk": {
-          "name": "todo_attachments_uploaded_by_users_id_fk",
-          "tableFrom": "todo_attachments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "uploaded_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_comments": {
-      "name": "todo_comments",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "author_id": {
-          "name": "author_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_todo_comments_todo": {
-          "name": "idx_todo_comments_todo",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todo_comments_author": {
-          "name": "idx_todo_comments_author",
-          "columns": [
-            "author_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_comments_todo_id_todos_id_fk": {
-          "name": "todo_comments_todo_id_todos_id_fk",
-          "tableFrom": "todo_comments",
-          "tableTo": "todos",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "todo_comments_author_id_users_id_fk": {
-          "name": "todo_comments_author_id_users_id_fk",
-          "tableFrom": "todo_comments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todos": {
-      "name": "todos",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'open'"
-        },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'medium'"
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "assignee_id": {
-          "name": "assignee_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "due_date": {
-          "name": "due_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_todos_creator": {
-          "name": "idx_todos_creator",
-          "columns": [
-            "creator_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todos_assignee": {
-          "name": "idx_todos_assignee",
-          "columns": [
-            "assignee_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todos_status": {
-          "name": "idx_todos_status",
-          "columns": [
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todos_creator_id_users_id_fk": {
-          "name": "todos_creator_id_users_id_fk",
-          "tableFrom": "todos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "creator_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "todos_assignee_id_users_id_fk": {
-          "name": "todos_assignee_id_users_id_fk",
-          "tableFrom": "todos",
-          "tableTo": "users",
-          "columnsFrom": [
-            "assignee_id"
           ],
           "columnsTo": [
             "id"

@@ -11,7 +11,17 @@
  * return `null` so the caller's policy decides (today: also reject).
  */
 
-export type SniffedKind = "image" | "pdf" | "text" | "zip" | "7z";
+export type SniffedKind
+  = | "jpeg"
+    | "png"
+    | "gif"
+    | "bmp"
+    | "webp"
+    | "tiff"
+    | "pdf"
+    | "text"
+    | "zip"
+    | "7z";
 
 interface Signature {
   readonly kind: SniffedKind;
@@ -20,15 +30,17 @@ interface Signature {
 }
 
 const SIGNATURES: readonly Signature[] = [
-  // Images
-  { kind: "image", bytes: [0xFF, 0xD8, 0xFF] }, // jpeg
-  { kind: "image", bytes: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] }, // png
-  { kind: "image", bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }, // gif87a
-  { kind: "image", bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }, // gif89a
-  { kind: "image", bytes: [0x42, 0x4D] }, // bmp
-  { kind: "image", bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }, // webp prefix (RIFF)
-  { kind: "image", bytes: [0x49, 0x49, 0x2A, 0x00] }, // tiff little-endian
-  { kind: "image", bytes: [0x4D, 0x4D, 0x00, 0x2A] }, // tiff big-endian
+  // Images — specific subtypes so `mimeMatchesContent` can refuse a
+  // mis-declared upload (jpeg bytes claiming image/png, etc.) instead of
+  // accepting every image/* claim by category. WebP is handled below as a
+  // special case because the RIFF prefix is shared with WAV / AVI.
+  { kind: "jpeg", bytes: [0xFF, 0xD8, 0xFF] },
+  { kind: "png", bytes: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+  { kind: "gif", bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }, // gif87a
+  { kind: "gif", bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }, // gif89a
+  { kind: "bmp", bytes: [0x42, 0x4D] },
+  { kind: "tiff", bytes: [0x49, 0x49, 0x2A, 0x00] }, // little-endian
+  { kind: "tiff", bytes: [0x4D, 0x4D, 0x00, 0x2A] }, // big-endian
 
   // PDF
   { kind: "pdf", bytes: [0x25, 0x50, 0x44, 0x46] }, // %PDF
@@ -49,6 +61,19 @@ function matches(buf: Uint8Array, sig: Signature): boolean {
       return false;
   }
   return true;
+}
+
+/**
+ * Real WebP files start with `RIFF` (4 bytes) + 4-byte size + `WEBP`.
+ * A plain `RIFF` prefix would also match WAV and AVI, so WebP is sniffed
+ * via the combined fingerprint rather than via the generic SIGNATURES
+ * table.
+ */
+function isWebp(buf: Uint8Array): boolean {
+  if (buf.length < 12)
+    return false;
+  return buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
+    && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
 }
 
 function looksLikeText(buf: Uint8Array): boolean {
@@ -76,6 +101,11 @@ function looksLikeText(buf: Uint8Array): boolean {
  * files are legitimate uploads).
  */
 export function sniffKind(buf: Uint8Array): SniffedKind | null {
+  // WebP must be checked before the generic SIGNATURES table because the
+  // shared `RIFF` prefix would otherwise need a dedicated entry; we keep
+  // the table prefix-only and let isWebp() apply the offset-8 verification.
+  if (isWebp(buf))
+    return "webp";
   for (const sig of SIGNATURES) {
     if (matches(buf, sig))
       return sig.kind;
@@ -86,10 +116,15 @@ export function sniffKind(buf: Uint8Array): SniffedKind | null {
 }
 
 /**
- * Verify the claimed MIME type matches what the magic bytes say. Returns
- * `true` when they agree (or when the claim is unverifiable but the bytes
- * match a known category — text is the trickiest case, anything ASCII-like
- * is allowed as text/*).
+ * Verify the claimed MIME type matches what the magic bytes say.
+ *
+ * For images, the match is on the exact subtype: jpeg bytes claiming
+ * `image/png` is rejected so the audit / quota row carries the right
+ * type, and the inline-render whitelist downstream stays honest. The
+ * common `image/jpg` alias for `image/jpeg` is accepted.
+ *
+ * For text, anything that looks like ASCII / UTF-8 may claim any
+ * `text/*` subtype (we cannot meaningfully sub-classify csv vs plain).
  */
 export function mimeMatchesContent(claimed: string, buf: Uint8Array): boolean {
   const kind = sniffKind(buf);
@@ -97,8 +132,18 @@ export function mimeMatchesContent(claimed: string, buf: Uint8Array): boolean {
     return false;
   const lc = claimed.toLowerCase();
   switch (kind) {
-    case "image":
-      return lc.startsWith("image/");
+    case "jpeg":
+      return lc === "image/jpeg" || lc === "image/jpg";
+    case "png":
+      return lc === "image/png";
+    case "gif":
+      return lc === "image/gif";
+    case "bmp":
+      return lc === "image/bmp" || lc === "image/x-ms-bmp";
+    case "webp":
+      return lc === "image/webp";
+    case "tiff":
+      return lc === "image/tiff" || lc === "image/x-tiff";
     case "pdf":
       return lc === "application/pdf";
     case "zip":

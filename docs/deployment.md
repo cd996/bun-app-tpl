@@ -15,9 +15,18 @@ bun run compile
 docker build -t myapp .
 ```
 
-The container's runtime base is `zzci/ubase` by default — change it in `Dockerfile` if you prefer a stock distroless or Alpine image. The compiled binary embeds the frontend assets and Drizzle migrations so the runtime layer only needs glibc + the libsql native binding (already copied in).
+The runtime layer uses `debian:stable-slim` by default — publicly pullable so forks `docker build` without an upstream credential dance. Override via `--build-arg RUNTIME_BASE=...` (e.g. distroless / a hardened internal base). The compiled binary embeds the frontend assets and Drizzle migrations so the runtime layer only needs glibc + the libsql native binding (already copied in) + `curl` for the HEALTHCHECK.
+
+Inject the source revision via `--build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)` so `app --version` and `/api/system/version` report the real hash — `.git` is excluded from the build context, so the build cannot resolve it on its own. CI / release pipelines should always set this.
 
 ## Required environment
+
+The complete env reference (every variable, its type, default, and
+description) is generated from the zod schema in `apps/api/src/config.ts`
+and the comments in `.env.example`. See [`env-reference.md`](env-reference.md);
+CI rejects PRs that leave it out of sync.
+
+Highlights for a production deploy:
 
 | Variable | Why |
 |---|---|
@@ -25,15 +34,12 @@ The container's runtime base is `zzci/ubase` by default — change it in `Docker
 | `ACCESS_URL` | Production redirect-URI base; forwarded headers are not trusted in prod |
 | `CORS_ORIGIN` | Comma-separated allow-list; fail-closed in prod when unset |
 | `BASE_PATH` | URL prefix the app is mounted under. Leave unset for root mount; set to the reverse-proxy mount (e.g. `/app`) when serving under a prefix |
-| `DB_PATH` | Mount a persistent volume for this directory |
-| `DB_ENCRYPTION` | Defaults to `false` for dev convenience — set `true` in production |
+| `DB_PATH`, `DB_ENCRYPTION` | Persistent volume for the DB; encryption defaults to off for dev — turn on in prod |
 | `OAUTH_*` | OIDC issuer or full endpoint set, plus client id/secret |
 | `DEFAULT_ADMIN` | Comma-separated emails that get admin role on first login (no-op if users exist) |
-| `LOG_FILE` | Mounted log volume; pino writes JSON lines |
-| `AUDIT_RETENTION_DAYS` | `0` (keep forever) by default; set to e.g. `90` in long-running deployments to bound `audit_events` size |
-| `MAX_UPLOAD_BYTES` | Per-file cap for attachment uploads. Default `10485760` (10 MB) |
-| `MAX_ATTACHMENTS_PER_RESOURCE` | Per-resource attachment count cap. Default `20` |
-| `UPLOADS_TOTAL_BYTES` | Optional cumulative quota across attachment tables. `0` (default) disables. Uploads past this return 413 |
+| `LOG_FILE` / `LOG_TO_STDOUT` | Either rotates on disk or hands lines to the runtime |
+| `AUDIT_RETENTION_DAYS` | `0` (keep forever) by default; set to a finite value in long-running deployments to bound `audit_events` size |
+| `SERVICE_TOKEN_METRICS`, `SERVICE_TOKEN_BACKUP` | Scoped bearers for `/api/metrics` and `/api/backup/export-via-token` |
 
 ## Volumes
 
@@ -43,7 +49,7 @@ The container declares `VOLUME /app/data`. Inside that volume the runtime writes
 |---|---|---|---|
 | `${DB_PATH}` (default `${ROOT_DIR}/data/db/app.db`) | `DB_PATH` (or `ROOT_DIR` when unset) | `app.db`, `app.db-wal`, `app.db-shm`, `meta.db` | Critical |
 | `${ROOT_DIR}/data/uploads/documents/` | `ROOT_DIR` (always) | Document attachments | Critical |
-| `${ROOT_DIR}/data/uploads/todos/` | `ROOT_DIR` (always) | Todo attachments | Critical |
+| `${ROOT_DIR}/data/uploads/issues/` | `ROOT_DIR` (always) | Issue attachments | Critical |
 | `${ROOT_DIR}/data/logs/` | `ROOT_DIR` (`LOG_FILE` may override the file path) | Runtime logs | Operational |
 
 **Watch out — the upload and log paths are *not* re-rooted by `DB_PATH`.** Overriding `DB_PATH` to a path outside `ROOT_DIR` does **not** relocate `data/uploads/` or `data/logs/` — those continue to write under `${ROOT_DIR}/data/`. The two safe operating modes are:
@@ -53,12 +59,13 @@ The container declares `VOLUME /app/data`. Inside that volume the runtime writes
 
 ## Health checks
 
-The API exposes:
+The API exposes two distinct probes:
 
-- `GET /<base>/api/health` → `{status: "ok"}` (always 200 once the process is up; does not require unlock)
-- `GET /<base>/api/encryption/status` → `{initialized, locked, status}` (use this to gate readiness behind unlock)
+- `GET /<base>/api/health` → `200 {status:"ok"}` whenever the process is alive. Use for **liveness** — restart-on-failure semantics.
+- `GET /<base>/api/health/ready` → `200 {status:"ready"}` when the DB is unlocked **and** reachable; `503 {status:"locked"\|"no_db"\|"db_unavailable"}` otherwise. Use for **readiness** — load-balancer pool membership.
+- `GET /<base>/api/encryption/status` is still available for richer debug info (returns `{initialized, locked, status, dbError}`) but should **not** be used as a probe — its 200 response doesn't imply ready.
 
-Recommended Kubernetes / docker-compose probe:
+Recommended Kubernetes / docker-compose probes:
 
 ```yaml
 livenessProbe:
@@ -67,9 +74,9 @@ livenessProbe:
     port: 3000
 readinessProbe:
   httpGet:
-    path: /app/api/encryption/status
+    path: /app/api/health/ready
     port: 3000
-  # treat 200 + status=unlocked as ready; anything else means setup or unlock is pending
+  # 200 = ready (db unlocked + reachable); 503 = drain traffic
 ```
 
 ## Reference compose stack (local dev / smoke test)

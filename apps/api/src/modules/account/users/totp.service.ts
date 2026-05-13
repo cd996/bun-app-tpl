@@ -159,10 +159,8 @@ export async function hasVerifiedTotp(db: AppDatabase, userId: string): Promise<
 }
 
 export async function verifyTotpCode(db: AppDatabase, userId: string, code: string): Promise<boolean> {
-  // Refuse before talking to the DB if the user is currently locked. The
-  // caller surfaces this via { locked, retryAfterSeconds } from
-  // isTotpUserLocked() — we still return false here so legacy boolean
-  // callers reject the attempt safely.
+  // Refuse before talking to the DB when the user is rate-limited; the
+  // caller still gets `false` and treats it as a verification failure.
   if (isTotpUserLocked(userId).locked)
     return false;
 

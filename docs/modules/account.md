@@ -6,17 +6,27 @@ Code layout:
 
 ```text
 apps/api/src/modules/account/
+  account.routes.ts            # aggregator: mounts auth + users + groups
+  account.backup.ts            # one BackupContribution for users + groups + preferences
+  index.ts                     # registers backup contribution + OAuth auth provider
   auth/
     auth.routes.ts
-    auth.service.ts
+    auth.service.ts            # session lookup, refresh, default-admin promotion
+    oidc.ts                    # OIDC client (oauth4webapi)
+    session-cookie.ts          # cookie name + parse / write helpers
+    schema.ts                  # `sessions` table
+    index.ts
   users/
+    schema.ts                  # `users`, `user_preferences`, `user_totp_devices`
     users.routes.ts
     users.service.ts
     totp.service.ts
+    index.ts
   groups/
+    schema.ts                  # `groups` (membership lives in `relation_tuples`)
     groups.routes.ts
     groups.service.ts
-  index.ts
+    index.ts
 ```
 
 ## Authentication
@@ -57,7 +67,7 @@ Implemented routes:
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/api/account/users/active` | Authenticated | Active user list for assignment and sharing UI. |
+| GET | `/api/account/visible-users` | Authenticated | Active user directory exposed to every signed-in caller, for assignment and sharing pickers. |
 | GET | `/api/account/users` | Admin | User list. |
 | GET | `/api/account/users/:id` | Admin | User detail. |
 | PATCH | `/api/account/users/:id` | Admin | Updates role, status, or profile fields. |

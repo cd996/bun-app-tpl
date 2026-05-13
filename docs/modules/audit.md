@@ -6,6 +6,7 @@ Code layout:
 
 ```text
 apps/api/src/modules/audit/
+  schema.ts             # `audit_events` table
   audit.routes.ts
   audit.service.ts
   retention.ts          # background sweep that prunes old events
@@ -39,7 +40,7 @@ apps/api/src/modules/audit/
 
 Audit records are stored in `audit_events` with actor, action, resource, request metadata, result, and optional JSON detail.
 
-The service is used by account, policy, document, todo, settings, encryption, and backup code paths.
+The service is used by account, policy, document, issue, settings, encryption, and backup code paths.
 
 ## Retention
 

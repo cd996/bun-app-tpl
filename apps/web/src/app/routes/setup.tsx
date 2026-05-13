@@ -30,9 +30,35 @@ interface EncryptionStatusResponse {
 const PENDING_KEY_STORAGE = `${APP_NAME}-pending-recovery-key`;
 const KEY_FILENAME = `${APP_NAME}-master-key.txt`;
 
+// Mid-flow recovery is bounded to a 10-minute window. The master private
+// key has to live somewhere visible to scripts to survive a reload between
+// "derived" and "user confirmed export", but persisting it indefinitely
+// would leave the recovery key in sessionStorage for the whole tab session
+// if a setup is started and never finished. After this TTL the cached
+// bundle is dropped on the next page load and the user re-derives.
+const PENDING_KEY_TTL_MS = 10 * 60 * 1000;
+
+interface PendingKeyBundle {
+  readonly key: string;
+  readonly savedAt: number;
+}
+
 function loadPendingKey(): string | null {
   try {
-    return sessionStorage.getItem(PENDING_KEY_STORAGE);
+    const raw = sessionStorage.getItem(PENDING_KEY_STORAGE);
+    if (!raw)
+      return null;
+    const parsed = JSON.parse(raw) as Partial<PendingKeyBundle>;
+    if (typeof parsed.key !== "string" || typeof parsed.savedAt !== "number") {
+      sessionStorage.removeItem(PENDING_KEY_STORAGE);
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > PENDING_KEY_TTL_MS) {
+      // Expired — clear so the user re-derives instead of seeing a stale key.
+      sessionStorage.removeItem(PENDING_KEY_STORAGE);
+      return null;
+    }
+    return parsed.key;
   }
   catch {
     return null;
@@ -41,7 +67,8 @@ function loadPendingKey(): string | null {
 
 function savePendingKey(key: string): void {
   try {
-    sessionStorage.setItem(PENDING_KEY_STORAGE, key);
+    const bundle: PendingKeyBundle = { key, savedAt: Date.now() };
+    sessionStorage.setItem(PENDING_KEY_STORAGE, JSON.stringify(bundle));
   }
   catch {
     // ignore — sessionStorage may be unavailable
@@ -167,8 +194,13 @@ function SetupPage() {
   const handleFinalize = useCallback(() => {
     // Hide the key from the rendered textarea but keep the ref alive so
     // "Show key again" still works until the user explicitly continues.
+    // Drop the sessionStorage copy here — the user has confirmed export, so
+    // there is no longer any reason to survive a reload with the key on
+    // disk in browser-readable storage. The ref keeps the value available
+    // for the remaining UI affordances of step 3.
     setBackupKey("");
     setKeyVisible(false);
+    clearPendingKey();
     setStep(3);
   }, []);
 
@@ -191,14 +223,14 @@ function SetupPage() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-svh items-center justify-center">
         <div className="text-muted-foreground">{t("common.loading", "Loading...")}</div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-8 text-center">
           <Logo className="mx-auto size-10 mb-3" />

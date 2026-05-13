@@ -34,9 +34,9 @@ describe("/api/account/users", () => {
     expect(res.status).toBe(403);
   });
 
-  it("authenticated non-admin can hit /account/users/active (assignment picker)", async () => {
+  it("authenticated non-admin can hit /account/visible-users (assignment picker)", async () => {
     const user = await getClient("user@example.com", "admin");
-    const res = await user.json<{ data: { id: string; name: string }[] }>("/api/account/users/active");
+    const res = await user.json<{ data: { id: string; name: string }[] }>("/api/account/visible-users");
     expect(Array.isArray(res.data)).toBe(true);
   });
 

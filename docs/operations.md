@@ -15,7 +15,7 @@ Rotate the master password (re-wraps the DEK with a new master keypair; cipherte
    ```http
    POST /app/api/encryption/challenge
    ```
-3. Call `POST /app/api/encryption/change-master` with the current and new master passwords (proving DEK ownership against the challenge). The exact request body shape is documented in the OpenAPI doc at `/app/api/docs`.
+3. Call `POST /app/api/encryption/change-master` with the current and new master passwords (proving DEK ownership against the challenge). See [`api.md`](api.md) for the request body shape.
 4. Save the new recovery key file the API returns. Store it in your password manager / sealed envelope process — **do not** keep it on the application server.
 
 ### Verification
@@ -45,7 +45,7 @@ The only recovery path is **restore from a JSON backup** taken with `/api/backup
 3. Move the existing DB files aside so the next start sees an empty database.
 4. Start the container. Read the auto-generated bootstrap token off stderr (`docker compose logs app | grep BOOTSTRAP_TOKEN`) or `<data dir>/bootstrap-token.txt`. Visit `/app/setup`, paste the token, and initialise with a **new** master password. Save the new recovery key. The token and file are removed once init succeeds.
 5. Sign in as admin and `POST /app/api/backup/import` with the most recent JSON backup. Import is schema-version-locked — the old binary used to take the export and the new binary used to import must be schema-compatible.
-6. Verify row counts and a representative document / todo / settings entry.
+6. Verify row counts and a representative document / issue / settings entry.
 7. Once verified, delete the forensic copy from step 2.
 
 If you do not have a JSON backup, the data is unrecoverable. This is the strongest possible argument for the snapshot sidecar described in `deployment.md`.
@@ -87,7 +87,7 @@ When the database has been corrupted, accidentally truncated, or you need to rol
 5. Visit `/app/unlock` and enter the master password that was active **at the time of the snapshot**. If you have rotated the master password since, you must restore both `app.db` *and* `meta.db` from the same snapshot window — they are coupled.
 6. Verify:
    - `GET /app/api/encryption/status` → `unlocked`.
-   - Spot-check the most recently created document/todo from before the incident.
+   - Spot-check the most recently created document/issue from before the incident.
    - `GET /app/api/audit?limit=20` shows recent entries.
 7. Once verified, retain `app.db.broken` for at least 24 hours, then delete.
 
@@ -102,7 +102,7 @@ Use during an incident response — abnormal logins, suspected privilege escalat
 - `GET /app/api/audit` — paginated list. Supports filters:
   - `actor` — username or user id
   - `action` — e.g. `auth.login`, `auth.logout`, `totp.verify`, `users.update`, `groups.add_member`, `tuples.create`, `documents.update`, `documents.share.add`, `attachments.upload`, `attachments.download`, `attachments.delete`, `settings.update`, `encryption.change_master`, `encryption.rotate_dek`, `backup.export`, `backup.import`
-  - `resource` — `documents:<id>`, `todos:<id>`, `users:<id>`, etc.
+  - `resource` — `documents:<id>`, `issues:<id>`, `users:<id>`, etc.
   - `result` — `success` | `failure`
   - `from`, `to` — ISO timestamps
   - `ip` — exact client IP
@@ -124,14 +124,16 @@ Use during an incident response — abnormal logins, suspected privilege escalat
 
 ## Service-token automation
 
-Two endpoints accept a long-lived bearer instead of an interactive admin session, both gated by the **same** `SERVICE_TOKEN` env var (≥ 32 chars):
+Two endpoints accept a bearer instead of a session cookie. Each scope is gated by its own env var (≥ 32 chars). Splitting the surfaces means a leaked metrics scraper credential cannot also dump the database.
 
-- `POST /app/api/backup/export-via-token` — streams the JSON backup. No DEK challenge, no master password. Used by `examples/compose/backup-sidecar.yml`.
-- `GET /app/api/metrics` — Prometheus exposition (HTTP request counter + duration histogram, encryption_locked gauge). Configure the Prometheus scrape job to send `Authorization: Bearer ${SERVICE_TOKEN}`.
+| Endpoint | Env |
+|---|---|
+| `POST /app/api/backup/export-via-token` — streams the JSON backup. No DEK challenge, no master password. Used by `examples/compose/backup-sidecar.yml`. | `SERVICE_TOKEN_BACKUP` |
+| `GET /app/api/metrics` — Prometheus exposition (HTTP request counter + duration histogram, encryption_locked gauge). Configure Prometheus to send `Authorization: Bearer ${SERVICE_TOKEN_METRICS}`. | `SERVICE_TOKEN_METRICS` |
 
-Operators that don't need either surface should leave `SERVICE_TOKEN` unset; both endpoints then return `503 SERVICE_TOKEN_DISABLED`. Rotate by changing the env var on both the API and any caller, then restarting the API. Constant-time comparison; no length oracle.
+Operators that don't need a surface should leave its env var unset; the endpoint then returns `503 SERVICE_TOKEN_DISABLED`. Rotate by changing the env var on both the API and any caller, then restarting the API. Constant-time comparison; no length oracle.
 
-Treat `SERVICE_TOKEN` like an OAuth client secret: store in your secrets manager, never commit to git. The audit row for `backup.export-via-token` records `actor:"system"` / `actorName:"system:backup-sidecar"` so you can distinguish automated dumps from operator-driven ones.
+Treat each token like an OAuth client secret: store in your secrets manager, never commit to git. The audit row for `backup.export-via-token` records `actor:"system"` / `actorName:"system:backup-sidecar"` so you can distinguish automated dumps from operator-driven ones.
 
 ---
 

@@ -1,20 +1,19 @@
 import type { Context } from "hono";
 import type { Config } from "@/config";
 import type { AppDatabase } from "@/db";
-import type { AuthConfig, OAuthConfig } from "@/shared/lib/app-config";
+import type { AuthConfig } from "@/shared/lib/app-config";
 import type { Logger } from "@/shared/lib/logger";
 import type { AppEnv, User } from "@/shared/lib/types";
 import { Buffer } from "node:buffer";
 import { randomBytes } from "node:crypto";
 import { count as countFn, eq, lte } from "drizzle-orm";
-import { deleteCookie, getCookie } from "hono/cookie";
 import { customAlphabet } from "nanoid";
 import { pkceChallenges, sessions } from "@/modules/account/auth/schema";
+import { clearSessionCookie, readSessionId } from "@/modules/account/auth/session-cookie";
 import { users } from "@/modules/account/users/schema";
 import { getOAuthConfig } from "@/shared/lib/app-config";
 
 const nanoid = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 8);
-const RE_TOKEN_PATH = /\/token\/?$/;
 
 // --- PKCE helpers ---
 
@@ -102,66 +101,7 @@ export async function consumePkceEntry(state: string): Promise<PkceEntry | undef
   };
 }
 
-export function buildAuthorizeUrl(oauth: OAuthConfig, callbackUrl: string, state: string, codeChallenge?: string): string {
-  const url = new URL(oauth.authorizeUrl);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", oauth.clientId);
-  url.searchParams.set("redirect_uri", callbackUrl);
-  url.searchParams.set("scope", "openid profile email");
-  url.searchParams.set("state", state);
-  if (oauth.pkce && codeChallenge) {
-    url.searchParams.set("code_challenge", codeChallenge);
-    url.searchParams.set("code_challenge_method", "S256");
-  }
-  return url.toString();
-}
-
-// --- Token exchange ---
-
-interface TokenResponse {
-  readonly access_token: string;
-  readonly refresh_token?: string;
-  readonly expires_in?: number;
-  readonly token_type: string;
-}
-
-export async function exchangeCodeForTokens(
-  oauth: OAuthConfig,
-  callbackUrl: string,
-  code: string,
-  codeVerifier?: string,
-  logger?: Logger,
-): Promise<TokenResponse> {
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: callbackUrl,
-    client_id: oauth.clientId,
-  });
-  if (oauth.pkce && codeVerifier) {
-    body.set("code_verifier", codeVerifier);
-  }
-  if (oauth.clientSecret) {
-    body.set("client_secret", oauth.clientSecret);
-  }
-
-  const res = await fetch(oauth.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    logger?.error({ status: res.status, errorBody: text.slice(0, 200) }, "OAuth token exchange failed");
-    throw new Error("OAuth token exchange failed");
-  }
-
-  return res.json() as Promise<TokenResponse>;
-}
-
-// --- Userinfo ---
+// --- User upsert ---
 
 interface OAuthUserInfo {
   readonly sub: string;
@@ -172,87 +112,6 @@ interface OAuthUserInfo {
   readonly picture?: string;
 }
 
-export async function fetchUserInfo(oauth: OAuthConfig, accessToken: string, logger?: Logger): Promise<OAuthUserInfo> {
-  const res = await fetch(oauth.userinfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    logger?.error({ status: res.status, errorBody: text.slice(0, 200) }, "OAuth userinfo fetch failed");
-    throw new Error("OAuth userinfo fetch failed");
-  }
-
-  return res.json() as Promise<OAuthUserInfo>;
-}
-
-// --- Token refresh ---
-
-interface RefreshResult {
-  readonly access_token: string;
-  readonly refresh_token?: string;
-  readonly expires_in?: number;
-}
-
-export async function refreshAccessToken(oauth: OAuthConfig, refreshToken: string): Promise<RefreshResult> {
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    client_id: oauth.clientId,
-  });
-  if (oauth.clientSecret) {
-    body.set("client_secret", oauth.clientSecret);
-  }
-
-  const res = await fetch(oauth.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Token refresh failed (${res.status})`);
-  }
-
-  return res.json() as Promise<RefreshResult>;
-}
-
-// --- Token revocation ---
-
-export async function revokeAccessToken(oauth: OAuthConfig, accessToken: string): Promise<void> {
-  if (!oauth.tokenUrl)
-    return;
-  // Try standard RFC 7009 revocation endpoint (tokenUrl base + /revoke)
-  const revocationUrl = oauth.tokenUrl.replace(RE_TOKEN_PATH, "/revoke");
-  if (revocationUrl === oauth.tokenUrl)
-    return; // Cannot derive revocation URL
-
-  try {
-    const body = new URLSearchParams({
-      token: accessToken,
-      token_type_hint: "access_token",
-      client_id: oauth.clientId,
-    });
-    if (oauth.clientSecret) {
-      body.set("client_secret", oauth.clientSecret);
-    }
-
-    await fetch(revocationUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-      signal: AbortSignal.timeout(5_000),
-    });
-  }
-  catch {
-    // Best-effort revocation — do not fail logout if provider is unreachable
-  }
-}
-
-// --- User upsert ---
-
 export async function upsertUser(
   db: AppDatabase,
   userInfo: OAuthUserInfo,
@@ -261,7 +120,11 @@ export async function upsertUser(
 ): Promise<typeof users.$inferSelect> {
   const now = new Date().toISOString();
   const defaultAdmins = authConfig.defaultAdmins;
-  const username = (userInfo.preferred_username ?? userInfo.username ?? userInfo.sub).toLowerCase();
+  // IdPs that don't expose a username claim (e.g. dex's password connector
+  // without a configured `username` field) would otherwise leak the opaque
+  // `sub` into a human-facing field. Fall back to a short random handle
+  // instead — the user can still be identified by email/name in the UI.
+  const username = (userInfo.preferred_username ?? userInfo.username ?? `u_${nanoid()}`).toLowerCase();
   const email = (userInfo.email ?? "").toLowerCase();
 
   const existing = await db.select().from(users).where(eq(users.oauthSub, userInfo.sub)).get();
@@ -281,12 +144,11 @@ export async function upsertUser(
     return { ...existing, lastLoginAt: now, updatedAt: now };
   }
 
-  // Bootstrap-admin assignment must be atomic with the insert. Two callbacks
-  // racing on a fresh install would otherwise both observe `userCount=0` and
-  // — if both also matched DEFAULT_ADMIN — both promote themselves; or if one
-  // matched and the other did not, the unmatched login could lock out the
-  // legitimate admin from ever bootstrapping. Wrap in a transaction and
-  // re-check the count under the same lock.
+  // Bootstrap-admin assignment must be atomic with the insert. Two DEFAULT_ADMIN
+  // callbacks racing on a fresh install would otherwise both observe
+  // `adminCount=0` and both promote themselves — harmless (both are
+  // legitimate DEFAULT_ADMIN entries) but the transaction also covers the
+  // duplicate-sub race below.
   return await db.transaction(async (tx) => {
     // Double-check inside the tx: another concurrent callback could have just
     // created the same user. If so, fall through to update behaviour.
@@ -305,24 +167,19 @@ export async function upsertUser(
       return { ...dupe, lastLoginAt: now, updatedAt: now };
     }
 
-    const userCount = await tx.select({ value: countFn() }).from(users).get();
-    const canBootstrapAdmin = (userCount?.value ?? 0) === 0;
+    // Gate bootstrap on "no admin exists" rather than "no user exists" so a
+    // non-admin signing up first doesn't lock out the DEFAULT_ADMIN. The
+    // promotion still fires whenever a matching login lands while the
+    // current admin set is empty (including after the only admin is
+    // deleted / demoted), and non-admin users can sign up freely the whole
+    // time.
+    const adminRow = await tx.select({ value: countFn() }).from(users).where(eq(users.role, "admin")).get();
+    const canBootstrapAdmin = (adminRow?.value ?? 0) === 0;
     const matchesDefaultAdmin = defaultAdmins.includes(username) || defaultAdmins.includes(email);
     const isAdmin = canBootstrapAdmin && matchesDefaultAdmin;
 
-    // When DEFAULT_ADMIN is set and the first arrival doesn't match, refuse
-    // to create a non-admin first user — otherwise the legitimate admin
-    // can never bootstrap because `userCount === 0` is gone forever.
-    if (canBootstrapAdmin && defaultAdmins.length > 0 && !matchesDefaultAdmin) {
-      logger.warn({ username, email }, "first login rejected: DEFAULT_ADMIN not yet bootstrapped");
-      throw new Error(
-        "Initial admin must complete first login before other users can sign up. "
-        + "DEFAULT_ADMIN does not match this account.",
-      );
-    }
-
     if (isAdmin) {
-      logger.info({ username }, "initial user assigned admin role via DEFAULT_ADMIN");
+      logger.info({ username }, "user assigned admin role via DEFAULT_ADMIN (no admin existed)");
     }
 
     const newUser = {
@@ -426,8 +283,6 @@ export function logDefaultAdmins(authConfig: AuthConfig, logger: Logger) {
 
 // --- AuthProvider implementation (registered with the shared middleware) ---
 
-const SESSION_COOKIE = "session_id";
-
 /**
  * Resolves the request's session-cookie-bound user. Refreshes the OAuth
  * access token when the local session is expired but a refresh token is
@@ -435,14 +290,14 @@ const SESSION_COOKIE = "session_id";
  */
 export async function oauthSessionAuthProvider(db: AppDatabase, c: Context<AppEnv>): Promise<User | undefined> {
   const config = c.get("config");
-  const sessionId = getCookie(c, SESSION_COOKIE);
+  const sessionId = readSessionId(c);
 
   if (!sessionId)
     return undefined;
 
   const result = await getSessionWithUser(db, sessionId);
   if (!result) {
-    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    clearSessionCookie(c, config.NODE_ENV);
     return undefined;
   }
 
@@ -450,7 +305,7 @@ export async function oauthSessionAuthProvider(db: AppDatabase, c: Context<AppEn
 
   if (user.status === "disabled") {
     await deleteSession(db, sessionId);
-    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    clearSessionCookie(c, config.NODE_ENV);
     return undefined;
   }
 
@@ -462,12 +317,12 @@ export async function oauthSessionAuthProvider(db: AppDatabase, c: Context<AppEn
       }
       catch {
         await deleteSession(db, sessionId);
-        deleteCookie(c, SESSION_COOKIE, { path: "/" });
+        clearSessionCookie(c, config.NODE_ENV);
         return undefined;
       }
     }
     await deleteSession(db, sessionId);
-    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    clearSessionCookie(c, config.NODE_ENV);
     return undefined;
   }
 

@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppSidebar } from "@/shared/components/app-sidebar";
 import { FullPageLoader } from "@/shared/components/full-page-loader";
+import { Logo } from "@/shared/components/logo";
 import { Button } from "@/shared/components/ui/button";
 import {
   SidebarInset,
@@ -67,7 +68,7 @@ function AppLayout() {
 
   if (networkError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-svh items-center justify-center bg-background p-4">
         <div className="mx-auto max-w-md text-center space-y-4">
           <h1 className="text-xl font-bold">{t("common.networkError.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("common.networkError.description")}</p>
@@ -102,12 +103,21 @@ function AppLayout() {
       </a>
       <AppSidebar />
       <SidebarInset className="h-svh">
-        {/* Mobile-only header */}
-        <header className="flex h-12 shrink-0 items-center border-b border-border/60 px-3 md:hidden">
+        {/* Mobile-only header — logo on the left, sidebar trigger on
+            the right so the brand reads first and the menu sits where
+            a thumb naturally lands. */}
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-3 md:hidden">
+          <Link
+            to="/portal"
+            className="flex items-center hover:opacity-90 transition-opacity"
+            aria-label={t("nav.home")}
+          >
+            <Logo className="size-7" />
+          </Link>
           <SidebarTrigger />
         </header>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto px-4 py-3 md:px-6 md:py-4">
+        <main id="main-content" tabIndex={-1} className="flex min-w-0 flex-1 flex-col overflow-auto px-4 py-3 md:px-6 md:py-4">
           <Outlet />
         </main>
       </SidebarInset>

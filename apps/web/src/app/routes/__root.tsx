@@ -13,7 +13,7 @@ export const Route = createRootRoute({
   notFoundComponent: NotFoundPage,
 });
 
-const BYPASS_SUFFIXES = ["/setup", "/unlock", "/denied", "/login", "/totp-verify"];
+const BYPASS_SUFFIXES = ["/setup", "/unlock", "/denied", "/login", "/totp-verify", "/error"];
 
 function redirectToLogin() {
   const current = window.location.pathname;
@@ -68,7 +68,7 @@ function RootLayout() {
 
   if (status === "db-error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-svh items-center justify-center bg-background">
         <div className="mx-auto max-w-md text-center space-y-4 p-6">
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-destructive/10">
             <span className="text-2xl">⚠</span>
@@ -97,7 +97,7 @@ function RootLayout() {
 
   if (status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-svh items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <p className="text-destructive">{t("common.error.systemUnavailable")}</p>
           <button
@@ -113,7 +113,7 @@ function RootLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-svh bg-background text-foreground">
       <Outlet />
     </div>
   );

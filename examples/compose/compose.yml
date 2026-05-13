@@ -42,10 +42,10 @@ services:
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
       OAUTH_PKCE: "true"
       DEFAULT_ADMIN: ${DEFAULT_ADMIN:-}
-      # Optional — when set, /api/metrics and /api/backup/export-via-token
-      # admit callers carrying this bearer. The same value is mounted into
-      # the backup sidecar (see backup-sidecar.yml).
-      SERVICE_TOKEN: ${SERVICE_TOKEN:-}
+      # Optional scoped service tokens — each opens a different surface so
+      # a leaked metrics credential cannot also dump the database.
+      SERVICE_TOKEN_METRICS: ${SERVICE_TOKEN_METRICS:-}
+      SERVICE_TOKEN_BACKUP: ${SERVICE_TOKEN_BACKUP:-}
     volumes:
       - app-data:/app/data
     expose:
@@ -59,7 +59,10 @@ services:
   # before exposing the stack beyond your laptop, or remove this service
   # entirely and point OAUTH_* at your production IdP.
   dex:
-    image: dexidp/dex:latest
+    # Pinned to a known-good tag — `:latest` would silently break the
+    # reference stack on a future dex major bump. Bump deliberately after
+    # verifying the upstream changelog; do not revert to `:latest`.
+    image: dexidp/dex:v2.43.1
     restart: unless-stopped
     command: ["dex", "serve", "/etc/dex/config.yaml"]
     volumes:

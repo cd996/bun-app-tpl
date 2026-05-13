@@ -1,9 +1,12 @@
 import type { AppEnv } from "@/shared/lib/types";
 import { createMiddleware } from "hono/factory";
+import { RE_ANY_SESSION_COOKIE } from "@/modules/account/auth/session-cookie";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RE_ORIGIN_FROM_REFERER = /^https?:\/\/[^/]+/;
-const RE_SESSION_COOKIE = /(?:^|;\s*)session_id=/;
+// Accepts either the dev (`session_id=`) or prod (`__Host-session_id=`)
+// cookie name; sourced from the auth module so both stay in lockstep.
+const RE_SESSION_COOKIE = RE_ANY_SESSION_COOKIE;
 
 /**
  * CSRF defense for mutating requests. Two checks:

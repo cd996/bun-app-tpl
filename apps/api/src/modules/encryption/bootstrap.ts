@@ -2,7 +2,7 @@ import type { Config } from "@/config";
 import type { AppDatabase } from "@/db";
 import type { Logger } from "@/shared/lib/logger";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { createDb } from "@/db";
@@ -69,18 +69,44 @@ export async function bootstrapEncryption(
     // The file is removed on the success path of /encryption/init AND on any
     // subsequent boot once meta exists (defence against a failed init that
     // left the file behind).
+    //
+    // Hardening: refuse to leave a bootstrap token on disk if we cannot
+    // verify the permissions are restrictive. Filesystems where chmod is a
+    // no-op (CIFS / NFS without --acl, root-squash mounts) would otherwise
+    // leave a world-readable secret behind. On verification failure we
+    // unlink the file and let the operator recover via stderr.
     try {
       mkdirSync(dirname(tokenFile), { recursive: true, mode: 0o700 });
       try {
         chmodSync(dirname(tokenFile), 0o700);
       }
       catch {
-        // perms may be denied on shared mounts — best-effort
+        // perms may be denied on shared mounts — verified below.
       }
       writeFileSync(tokenFile, `${bootstrapToken}\n`, { mode: 0o600 });
-      logger.warn({ tokenFile }, "encryption setup pending; bootstrap token written to file (delete after /encryption/init)");
+      // Verify the actual on-disk mode: chmod / mkdir may have silently
+      // failed on some filesystems even though the calls themselves
+      // didn't throw. Mask off type bits; require owner-only access.
+      const fileMode = statSync(tokenFile).mode & 0o777;
+      const dirMode = statSync(dirname(tokenFile)).mode & 0o777;
+      if ((fileMode & 0o077) !== 0 || (dirMode & 0o077) !== 0) {
+        rmSync(tokenFile, { force: true });
+        logger.error(
+          { tokenFile, fileMode: fileMode.toString(8), dirMode: dirMode.toString(8) },
+          "bootstrap-token.txt removed: filesystem permissions are too permissive (file/dir not 0o600/0o700). Read the token from stderr instead.",
+        );
+      }
+      else {
+        logger.warn({ tokenFile }, "encryption setup pending; bootstrap token written to file (delete after /encryption/init)");
+      }
     }
     catch (err) {
+      // Write itself failed — also clean up any half-written remnant. The
+      // operator still has stderr.
+      try {
+        rmSync(tokenFile, { force: true });
+      }
+      catch {}
       logger.error({ err }, "failed to write bootstrap-token.txt; operator must read the value from stderr");
     }
   }

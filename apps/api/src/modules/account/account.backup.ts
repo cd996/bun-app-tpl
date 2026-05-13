@@ -2,11 +2,10 @@ import type { BackupContribution } from "@/modules/backup/registry";
 import { groups } from "@/modules/account/groups/schema";
 import { userPreferences, users } from "@/modules/account/users/schema";
 
-/**
- * Backup contribution for the account meta-module (users + groups +
- * per-user preferences). Lumped under `users` for backward compatibility
- * with backup files written by previous versions of the template.
- */
+// One backup row per meta-module — users + groups + per-user preferences
+// stay together so an import never separates membership from members.
+// `name` is the stable identifier in backup files; renaming it is a
+// breaking change (bump file `version` in export.service.ts).
 export const accountBackupContribution: BackupContribution = {
   name: "users",
   tables: [users, groups, userPreferences],

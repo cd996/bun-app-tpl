@@ -4,7 +4,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { eciesDecrypt, hexToBytes } from "@app/shared";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { z } from "zod";
 import { audit } from "@/modules/audit/audit.service";
 import { getClientIp } from "@/shared/lib/client-ip";
@@ -186,7 +186,7 @@ async function decryptDekFromChallenge(challengeId: string, encryptedDekHex: str
  * those via POST /encryption/unlock-challenge (rate-limited).
  */
 export function encryptionStatusRoute() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   router.get("/encryption/status", (c) => {
     checkStatusRateLimit(c, rateLimitKey(c));
@@ -230,7 +230,7 @@ export function encryptionStatusRoute() {
 
 /** Routes available even when system is locked (no session auth; bootstrap-token / rate-limit gated where needed). */
 export function encryptionPublicRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   // POST /encryption/unlock-challenge — return the materials the SPA needs to
   // perform an unlock attempt: a fresh ECIES challenge bound to this caller plus
@@ -323,11 +323,12 @@ export function encryptionPublicRoutes() {
       return c.json({ success: true, data: result });
     }
     catch (err) {
-      throw new AppError(
-        err instanceof Error ? err.message : "Initialization failed",
-        500,
-        "INIT_FAILED",
-      );
+      // Map raw libsql / IO / crypto error text to a fixed code so the
+      // anonymous setup caller never sees internal error strings. The full
+      // message still goes to the structured logger.
+      c.get("logger").error({ err }, "encryption.init failed");
+      setDbError("init_failed");
+      throw new AppError("Initialization failed", 500, "INIT_FAILED");
     }
     finally {
       endOperation();
@@ -387,7 +388,7 @@ export function encryptionPublicRoutes() {
 
 /** Routes that require the system to be unlocked (auth required). */
 export function encryptionProtectedRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   router.use("*", authRequired);
   // POST /encryption/challenge — create an ephemeral challenge for admin operations
@@ -432,7 +433,19 @@ export function encryptionProtectedRoutes() {
   // the WAL is busy. See docs/modules/encryption.md. Production operators
   // should prefer `/encryption/change-master` (re-wraps the same DEK with a
   // new master pubkey, no row rewrite) until this is resolved.
+  //
+  // Gated by `ENABLE_EXPERIMENTAL_DEK_ROTATION` (default false) so an
+  // accidental admin call can't kick off a long-running rewrite that
+  // hits the known IOERR mid-flight.
   router.post("/encryption/rotate-dek", adminRequired, async (c) => {
+    const config = c.get("config");
+    if (!config.ENABLE_EXPERIMENTAL_DEK_ROTATION) {
+      throw new AppError(
+        "DEK rotation is experimental and disabled. Set ENABLE_EXPERIMENTAL_DEK_ROTATION=true to opt in.",
+        501,
+        "NOT_IMPLEMENTED",
+      );
+    }
     if (!isUnlocked()) {
       throw new AppError("System is locked", 503, "SYSTEM_LOCKED");
     }
@@ -440,7 +453,6 @@ export function encryptionProtectedRoutes() {
       throw new AppError("Encryption operation already in progress", 409, "OPERATION_IN_PROGRESS");
     }
 
-    const config = c.get("config");
     const db = c.get("db");
     const user = c.get("user")!;
 
@@ -495,11 +507,11 @@ export function encryptionProtectedRoutes() {
       }
       if (err instanceof AppError)
         throw err;
-      throw new AppError(
-        errorMessage || "DEK rotation failed",
-        500,
-        "ROTATE_FAILED",
-      );
+      // The audit `detail` above keeps the underlying message for admin
+      // forensics, but the response body must not echo libsql / IO error
+      // strings back to the client — return a fixed string and rely on the
+      // structured logger + audit row for triage.
+      throw new AppError("DEK rotation failed", 500, "ROTATE_FAILED");
     }
     finally {
       endOperation();
@@ -542,11 +554,8 @@ export function encryptionProtectedRoutes() {
     catch (err) {
       if (err instanceof AppError)
         throw err;
-      throw new AppError(
-        err instanceof Error ? err.message : "Master key change failed",
-        500,
-        "CHANGE_MASTER_FAILED",
-      );
+      c.get("logger").error({ err }, "encryption.change_master failed");
+      throw new AppError("Master key change failed", 500, "CHANGE_MASTER_FAILED");
     }
     finally {
       endOperation();

@@ -1,17 +1,11 @@
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { BackupData } from "./export.service";
 import type { AppDatabase } from "@/db";
-import { resolve } from "node:path";
 import { getTableColumns, getTableName, sql } from "drizzle-orm";
-import { buildDocumentAttachmentPath, sanitizeAttachmentFilename, UPLOAD_BASE_DOC_DIR } from "@/modules/document/attachment.service";
-import { buildTodoAttachmentPath, UPLOAD_BASE_TODO_DIR } from "@/modules/todo/attachment.service";
-import { ROOT_DIR } from "@/root";
 import { AppError } from "@/shared/lib/errors";
 import { getDataModules, resolveModulesWithDeps } from "./registry";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
-const UPLOAD_BASE_DIR = resolve(ROOT_DIR, "data/uploads");
 
 const INSERT_BATCH_SIZE = 500;
 
@@ -183,17 +177,6 @@ function getInsertOrder(modules: string[]): SQLiteTable[] {
 }
 
 /**
- * Assert that a path resolves inside the on-disk uploads tree. Defends against
- * a malicious backup row that supplies an absolute or `..`-laden filepath.
- */
-function assertPathInsideUploads(filepath: string, tableName: string): void {
-  const absolute = resolve(filepath);
-  if (!absolute.startsWith(`${resolve(UPLOAD_BASE_DIR)}/`) && absolute !== resolve(UPLOAD_BASE_DIR)) {
-    throw new AppError(`Invalid row in ${tableName}`, 400, "INVALID_BACKUP_ROW");
-  }
-}
-
-/**
  * Validate that every key in `row` is a known column on `table`. Drops the
  * row entirely if a foreign key is present that the schema does not expect.
  */
@@ -206,40 +189,6 @@ function validateRowShape(table: SQLiteTable, tableName: string, row: Record<str
   }
 }
 
-/**
- * For attachment tables, replace any client-supplied `filepath` with one
- * derived server-side from the row's id and parent id. Sanitize `filename`
- * so it cannot contain path separators or null bytes.
- */
-function sanitizeAttachmentRow(
-  tableName: string,
-  row: Record<string, unknown>,
-): Record<string, unknown> {
-  if (tableName === "document_attachments") {
-    const id = String(row.id ?? "");
-    const documentId = String(row.documentId ?? row.document_id ?? "");
-    const filename = sanitizeAttachmentFilename(String(row.filename ?? ""));
-    if (!id || !documentId) {
-      throw new AppError(`Invalid row in ${tableName}`, 400, "INVALID_BACKUP_ROW");
-    }
-    const filepath = buildDocumentAttachmentPath(id, documentId, filename);
-    assertPathInsideUploads(filepath, tableName);
-    return { ...row, filename, filepath };
-  }
-  if (tableName === "todo_attachments") {
-    const id = String(row.id ?? "");
-    const todoId = String(row.todoId ?? row.todo_id ?? "");
-    const filename = sanitizeAttachmentFilename(String(row.filename ?? ""));
-    if (!id || !todoId) {
-      throw new AppError(`Invalid row in ${tableName}`, 400, "INVALID_BACKUP_ROW");
-    }
-    const filepath = buildTodoAttachmentPath(id, todoId, filename);
-    assertPathInsideUploads(filepath, tableName);
-    return { ...row, filename, filepath };
-  }
-  return row;
-}
-
 export async function importJsonBackup(db: AppDatabase, data: BackupData): Promise<{ tablesImported: number; rowsImported: number }> {
   const modules = data.modules;
   const deleteOrder = getDeleteOrder(modules);
@@ -247,11 +196,6 @@ export async function importJsonBackup(db: AppDatabase, data: BackupData): Promi
 
   let tablesImported = 0;
   let rowsImported = 0;
-
-  // Pre-flight: keep the upload-base anchor warm so the path-prefix check
-  // below cannot be tricked by a relative tree.
-  void UPLOAD_BASE_DOC_DIR;
-  void UPLOAD_BASE_TODO_DIR;
 
   await db.transaction(async (tx) => {
     // defer_foreign_keys is checked at COMMIT time only and applies for the
@@ -272,7 +216,7 @@ export async function importJsonBackup(db: AppDatabase, data: BackupData): Promi
       tablesImported++;
 
       const sanitized: Record<string, unknown>[] = rows.map((raw) => {
-        const row = sanitizeAttachmentRow(tableName, { ...raw });
+        const row = { ...raw };
         validateRowShape(table, tableName, row);
         assertIdShape(row);
         return row;

@@ -2,7 +2,7 @@
 
 > Examples assume `BASE_PATH=/app`. The app is mounted at root (`/`) by default; set `BASE_PATH` to serve under a URL prefix.
 
-This is a Bun monorepo template that provides an OAuth-backed internal workspace for account management, policy tuples, documents, todos, settings, audit logs, encryption administration, and database backup.
+This is a Bun monorepo template that provides an OAuth-backed internal workspace: account management, Zanzibar-style policy tuples, documents, issues, settings, audit logs, optional DB-at-rest encryption, and JSON backup.
 
 This document describes the implemented architecture in the current codebase. Planned integrations should live in separate roadmap or planning documents, not in current-state architecture docs.
 
@@ -40,7 +40,7 @@ The outer app serves:
 | Layer | Technology |
 |---|---|
 | Runtime | Bun |
-| API | Hono with `OpenAPIHono` |
+| API | Hono |
 | Database | SQLite through Drizzle ORM |
 | Web | React, Vite, TanStack Router, TanStack Query |
 | Styling | Tailwind CSS |
@@ -65,8 +65,8 @@ apps/
       app/
       shared/
 packages/
-  config/
-  shared/
+  shared/      # ECIES utilities used by api and web
+  tsconfig/    # shared tsconfig
 scripts/
 docs/
 ```
@@ -81,25 +81,29 @@ apps/api/src/modules/
     groups/
   audit/
   backup/
-  document/
+  document/        # sub-type of item
   encryption/
+  file/            # blob storage; pluggable drivers + content dedupe
+  issue/           # sub-type of item
+  item/            # base for content sub-types
   policy/
   settings/
   system/
-  todo/
 ```
 
 | Module | Responsibility | Details |
 |---|---|---|
-| `account` | OAuth login, sessions, current user, users, groups, and TOTP. | [account.md](modules/account.md) |
-| `audit` | Querying persisted audit events. | [audit.md](modules/audit.md) |
-| `backup` | JSON backup export and import. | See [api.md](api.md). |
-| `document` | Documents, folders, attachments, comments, and shares. | See [api.md](api.md). |
-| `encryption` | Database encryption setup, unlock, metadata, and key rotation. | See [api.md](api.md). |
-| `policy` | Relation tuple management, check, expand, and resource groups. | [policy.md](modules/policy.md) |
-| `settings` | Runtime settings storage and masking. | See [api.md](api.md). |
-| `system` | Health and OpenAPI docs. | [system.md](modules/system.md) |
-| `todo` | Todos, attachments, and comments. | See [api.md](api.md). |
+| `account` | OAuth login, sessions, current user, users, groups, TOTP. | [account.md](modules/account.md) |
+| `audit` | Persisted audit events + retention sweep. | [audit.md](modules/audit.md) |
+| `backup` | JSON backup export and import (admin + service-token surfaces). | [backup.md](modules/backup.md) |
+| `document` | Documents, attachments, comments, shares; sub-type of `item`. | [document.md](modules/document.md) |
+| `encryption` | DB-at-rest encryption setup, unlock, metadata, key rotation. | [encryption.md](modules/encryption.md) |
+| `file` | Content-addressable blob storage with pluggable drivers and ref counting. | [file.md](modules/file.md) |
+| `issue` | Issues, attachments, comments; sub-type of `item`. | [issue.md](modules/issue.md) |
+| `item` | Base primitive for content sub-types (common metadata + comments + permission edges). | [item.md](modules/item.md) |
+| `policy` | Zanzibar-style relation tuples, check, expand, resource groups. | [policy.md](modules/policy.md) |
+| `settings` | Runtime key/value settings store. | [settings.md](modules/settings.md) |
+| `system` | Health probes, build version, Prometheus metrics, upload limits. | [system.md](modules/system.md) |
 
 ## Request Flow
 
@@ -133,7 +137,20 @@ Unauthenticated user
 
 Sessions are stored in SQLite. The browser stores only the HTTP-only session cookie.
 
-OAuth/OIDC provider configuration is read from environment variables at runtime. The admin settings UI does not own these values, which prevents a bad database setting from breaking login. `DEFAULT_ADMIN` is a one-time bootstrap input: when no users exist, the first login matching that configured username or email becomes admin.
+### Session token storage
+
+Each session row carries the upstream OAuth `access_token` and `refresh_token` as plain columns. Their protection at rest depends on `DB_ENCRYPTION`:
+
+| `DB_ENCRYPTION` | At-rest protection for session tokens |
+|---|---|
+| `true` (recommended for production) | libsql encrypts the whole SQLite file with the DEK; rows are unreadable without the master key. |
+| `false` (template default — dev convenience) | Tokens live as cleartext SQL strings in `app.db`. Anyone with read access to the file (filesystem, snapshot, leaked backup) gets the tokens. |
+
+For deployments that disable encryption (e.g. local dev, or a single-tenant box where the file is already covered by full-disk encryption) this trade-off is acceptable. If sessions must be defensible even when an attacker can read `app.db`, run with `DB_ENCRYPTION=true` or wrap the columns at the application layer before persisting. Drizzle's `defaultFn` is a reasonable seam.
+
+`DEFAULT_ADMIN` is the bootstrap input: whenever the user table contains no rows with `role=admin`, the next login matching the configured username or email is promoted. Non-admin users may sign up at any time without locking the bootstrap window — the gate is on admin presence, not on user-count zero.
+
+OAuth/OIDC provider configuration is read from environment variables at runtime. The admin settings UI does not own these values, which prevents a bad database setting from breaking login.
 
 ## Authorization Model
 
@@ -160,6 +177,3 @@ Runtime data is stored below `ROOT_DIR`:
 | `data/db/app.pid` | PID lock file. |
 | `data/logs/app.log` | Structured JSON logs. |
 
-## Current Non-Goals
-
-The current codebase does not implement application inventory, domain management, host management, Headscale proxying, PowerDNS sync, API key management, or Traefik ForwardAuth routes. Do not document those as current behavior unless the corresponding code is added.

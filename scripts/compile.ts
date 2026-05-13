@@ -60,8 +60,21 @@ const RE_SLASH_TRIM = /^\/+|\/+$/g;
 const trimmedBase = (process.env.BASE_PATH ?? "").replace(RE_SLASH_TRIM, "");
 const URL_PREFIX = trimmedBase ? `/${trimmedBase}` : "";
 
-const gitResult = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: ROOT });
-const commit = gitResult.stdout.toString().trim() || "unknown";
+// `BUILD_COMMIT` lets the Dockerfile inject the source revision via
+// `--build-arg` — necessary because the production image excludes `.git`
+// (see .dockerignore) and `git rev-parse` would return "unknown". When run
+// outside the Docker build (local `bun run compile`, CI release), the env
+// var is unset and we fall back to `git rev-parse`, finally to "unknown"
+// when neither is available.
+const envCommit = (process.env.BUILD_COMMIT ?? "").trim();
+let commit: string;
+if (envCommit) {
+  commit = envCommit;
+}
+else {
+  const gitResult = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: ROOT });
+  commit = gitResult.stdout.toString().trim() || "unknown";
+}
 
 // ---------- 0. Recover from interrupted previous run ----------
 for (const tmp of [`${STATIC_FILE}.tmp`, `${MIGRATIONS_FILE}.tmp`]) {

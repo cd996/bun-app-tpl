@@ -87,4 +87,49 @@ describe("upsertUser DEFAULT_ADMIN bootstrap", () => {
     expect(updated.role).toBe("user");
     expect(row?.role).toBe("user");
   });
+
+  test("promotes DEFAULT_ADMIN even when a non-admin user signed up first", async () => {
+    // Bootstrap is gated on "no admin exists", not "no user exists", so a
+    // regular employee logging in before the admin must not lock the admin
+    // out of auto-promotion.
+    const first = await upsertUser(
+      db,
+      { sub: "sub-bob", preferred_username: "bob", email: "bob@example.com" },
+      authConfig(["admin@example.com"]),
+      logger,
+    );
+
+    const admin = await upsertUser(
+      db,
+      { sub: "sub-admin", preferred_username: "admin", email: "admin@example.com" },
+      authConfig(["admin@example.com"]),
+      logger,
+    );
+
+    expect(first.role).toBe("user");
+    expect(admin.role).toBe("admin");
+  });
+
+  test("re-promotes DEFAULT_ADMIN after the only admin is deleted", async () => {
+    // Initial bootstrap.
+    const initial = await upsertUser(
+      db,
+      { sub: "sub-initial", preferred_username: "initial", email: "initial@example.com" },
+      authConfig(["initial@example.com", "backup@example.com"]),
+      logger,
+    );
+    expect(initial.role).toBe("admin");
+
+    // Operator removes the initial admin (e.g. employee left).
+    await db.delete(users).where(eq(users.id, initial.id)).run();
+
+    // A different DEFAULT_ADMIN logs in for the first time.
+    const backup = await upsertUser(
+      db,
+      { sub: "sub-backup", preferred_username: "backup", email: "backup@example.com" },
+      authConfig(["initial@example.com", "backup@example.com"]),
+      logger,
+    );
+    expect(backup.role).toBe("admin");
+  });
 });

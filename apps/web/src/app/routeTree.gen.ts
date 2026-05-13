@@ -13,23 +13,21 @@ import { Route as UnlockRouteImport } from './routes/unlock'
 import { Route as TotpVerifyRouteImport } from './routes/totp-verify'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ErrorRouteImport } from './routes/error'
 import { Route as DeniedRouteImport } from './routes/denied'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppPortalIndexRouteImport } from './routes/_app/portal/index'
-import { Route as AppPortalTodosRouteImport } from './routes/_app/portal/todos'
+import { Route as AppPortalIssuesRouteImport } from './routes/_app/portal/issues'
 import { Route as AppPortalDocumentsRouteImport } from './routes/_app/portal/documents'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app/admin/settings'
 import { Route as AppAdminPoliciesRouteImport } from './routes/_app/admin/policies'
 import { Route as AppAdminAuditRouteImport } from './routes/_app/admin/audit'
-import { Route as AppPortalTodosIndexRouteImport } from './routes/_app/portal/todos/index'
-import { Route as AppPortalDocumentsIndexRouteImport } from './routes/_app/portal/documents/index'
+import { Route as AppPortalIssuesIndexRouteImport } from './routes/_app/portal/issues/index'
 import { Route as AppAdminUsersIndexRouteImport } from './routes/_app/admin/users/index'
-import { Route as AppPortalTodosTodoIdRouteImport } from './routes/_app/portal/todos/$todoId'
-import { Route as AppPortalDocumentsNewRouteImport } from './routes/_app/portal/documents/new'
-import { Route as AppPortalDocumentsDocIdRouteImport } from './routes/_app/portal/documents/$docId'
+import { Route as AppPortalIssuesIssueIdRouteImport } from './routes/_app/portal/issues/$issueId'
 import { Route as AppAdminUsersGroupsRouteImport } from './routes/_app/admin/users/groups'
 
 const UnlockRoute = UnlockRouteImport.update({
@@ -50,6 +48,11 @@ const SetupRoute = SetupRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ErrorRoute = ErrorRouteImport.update({
+  id: '/error',
+  path: '/error',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeniedRoute = DeniedRouteImport.update({
@@ -78,9 +81,9 @@ const AppPortalIndexRoute = AppPortalIndexRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_app/portal/index.lazy').then((d) => d.Route),
 )
-const AppPortalTodosRoute = AppPortalTodosRouteImport.update({
-  id: '/portal/todos',
-  path: '/portal/todos',
+const AppPortalIssuesRoute = AppPortalIssuesRouteImport.update({
+  id: '/portal/issues',
+  path: '/portal/issues',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPortalDocumentsRoute = AppPortalDocumentsRouteImport.update({
@@ -116,19 +119,12 @@ const AppAdminAuditRoute = AppAdminAuditRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_app/admin/audit.lazy').then((d) => d.Route),
 )
-const AppPortalTodosIndexRoute = AppPortalTodosIndexRouteImport.update({
+const AppPortalIssuesIndexRoute = AppPortalIssuesIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppPortalTodosRoute,
+  getParentRoute: () => AppPortalIssuesRoute,
 } as any).lazy(() =>
-  import('./routes/_app/portal/todos/index.lazy').then((d) => d.Route),
-)
-const AppPortalDocumentsIndexRoute = AppPortalDocumentsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppPortalDocumentsRoute,
-} as any).lazy(() =>
-  import('./routes/_app/portal/documents/index.lazy').then((d) => d.Route),
+  import('./routes/_app/portal/issues/index.lazy').then((d) => d.Route),
 )
 const AppAdminUsersIndexRoute = AppAdminUsersIndexRouteImport.update({
   id: '/',
@@ -137,26 +133,12 @@ const AppAdminUsersIndexRoute = AppAdminUsersIndexRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_app/admin/users/index.lazy').then((d) => d.Route),
 )
-const AppPortalTodosTodoIdRoute = AppPortalTodosTodoIdRouteImport.update({
-  id: '/$todoId',
-  path: '/$todoId',
-  getParentRoute: () => AppPortalTodosRoute,
+const AppPortalIssuesIssueIdRoute = AppPortalIssuesIssueIdRouteImport.update({
+  id: '/$issueId',
+  path: '/$issueId',
+  getParentRoute: () => AppPortalIssuesRoute,
 } as any).lazy(() =>
-  import('./routes/_app/portal/todos/$todoId.lazy').then((d) => d.Route),
-)
-const AppPortalDocumentsNewRoute = AppPortalDocumentsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AppPortalDocumentsRoute,
-} as any).lazy(() =>
-  import('./routes/_app/portal/documents/new.lazy').then((d) => d.Route),
-)
-const AppPortalDocumentsDocIdRoute = AppPortalDocumentsDocIdRouteImport.update({
-  id: '/$docId',
-  path: '/$docId',
-  getParentRoute: () => AppPortalDocumentsRoute,
-} as any).lazy(() =>
-  import('./routes/_app/portal/documents/$docId.lazy').then((d) => d.Route),
+  import('./routes/_app/portal/issues/$issueId.lazy').then((d) => d.Route),
 )
 const AppAdminUsersGroupsRoute = AppAdminUsersGroupsRouteImport.update({
   id: '/groups',
@@ -169,6 +151,7 @@ const AppAdminUsersGroupsRoute = AppAdminUsersGroupsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/denied': typeof DeniedRoute
+  '/error': typeof ErrorRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/totp-verify': typeof TotpVerifyRoute
@@ -178,20 +161,18 @@ export interface FileRoutesByFullPath {
   '/admin/policies': typeof AppAdminPoliciesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRouteWithChildren
-  '/portal/documents': typeof AppPortalDocumentsRouteWithChildren
-  '/portal/todos': typeof AppPortalTodosRouteWithChildren
+  '/portal/documents': typeof AppPortalDocumentsRoute
+  '/portal/issues': typeof AppPortalIssuesRouteWithChildren
   '/portal/': typeof AppPortalIndexRoute
   '/admin/users/groups': typeof AppAdminUsersGroupsRoute
-  '/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
-  '/portal/documents/new': typeof AppPortalDocumentsNewRoute
-  '/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
+  '/portal/issues/$issueId': typeof AppPortalIssuesIssueIdRoute
   '/admin/users/': typeof AppAdminUsersIndexRoute
-  '/portal/documents/': typeof AppPortalDocumentsIndexRoute
-  '/portal/todos/': typeof AppPortalTodosIndexRoute
+  '/portal/issues/': typeof AppPortalIssuesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/denied': typeof DeniedRoute
+  '/error': typeof ErrorRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/totp-verify': typeof TotpVerifyRoute
@@ -200,20 +181,19 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/policies': typeof AppAdminPoliciesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
+  '/portal/documents': typeof AppPortalDocumentsRoute
   '/portal': typeof AppPortalIndexRoute
   '/admin/users/groups': typeof AppAdminUsersGroupsRoute
-  '/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
-  '/portal/documents/new': typeof AppPortalDocumentsNewRoute
-  '/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
+  '/portal/issues/$issueId': typeof AppPortalIssuesIssueIdRoute
   '/admin/users': typeof AppAdminUsersIndexRoute
-  '/portal/documents': typeof AppPortalDocumentsIndexRoute
-  '/portal/todos': typeof AppPortalTodosIndexRoute
+  '/portal/issues': typeof AppPortalIssuesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/denied': typeof DeniedRoute
+  '/error': typeof ErrorRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/totp-verify': typeof TotpVerifyRoute
@@ -223,22 +203,20 @@ export interface FileRoutesById {
   '/_app/admin/policies': typeof AppAdminPoliciesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRouteWithChildren
-  '/_app/portal/documents': typeof AppPortalDocumentsRouteWithChildren
-  '/_app/portal/todos': typeof AppPortalTodosRouteWithChildren
+  '/_app/portal/documents': typeof AppPortalDocumentsRoute
+  '/_app/portal/issues': typeof AppPortalIssuesRouteWithChildren
   '/_app/portal/': typeof AppPortalIndexRoute
   '/_app/admin/users/groups': typeof AppAdminUsersGroupsRoute
-  '/_app/portal/documents/$docId': typeof AppPortalDocumentsDocIdRoute
-  '/_app/portal/documents/new': typeof AppPortalDocumentsNewRoute
-  '/_app/portal/todos/$todoId': typeof AppPortalTodosTodoIdRoute
+  '/_app/portal/issues/$issueId': typeof AppPortalIssuesIssueIdRoute
   '/_app/admin/users/': typeof AppAdminUsersIndexRoute
-  '/_app/portal/documents/': typeof AppPortalDocumentsIndexRoute
-  '/_app/portal/todos/': typeof AppPortalTodosIndexRoute
+  '/_app/portal/issues/': typeof AppPortalIssuesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/denied'
+    | '/error'
     | '/login'
     | '/setup'
     | '/totp-verify'
@@ -249,19 +227,17 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/portal/documents'
-    | '/portal/todos'
+    | '/portal/issues'
     | '/portal/'
     | '/admin/users/groups'
-    | '/portal/documents/$docId'
-    | '/portal/documents/new'
-    | '/portal/todos/$todoId'
+    | '/portal/issues/$issueId'
     | '/admin/users/'
-    | '/portal/documents/'
-    | '/portal/todos/'
+    | '/portal/issues/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/denied'
+    | '/error'
     | '/login'
     | '/setup'
     | '/totp-verify'
@@ -270,19 +246,18 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/policies'
     | '/admin/settings'
+    | '/portal/documents'
     | '/portal'
     | '/admin/users/groups'
-    | '/portal/documents/$docId'
-    | '/portal/documents/new'
-    | '/portal/todos/$todoId'
+    | '/portal/issues/$issueId'
     | '/admin/users'
-    | '/portal/documents'
-    | '/portal/todos'
+    | '/portal/issues'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/denied'
+    | '/error'
     | '/login'
     | '/setup'
     | '/totp-verify'
@@ -293,21 +268,19 @@ export interface FileRouteTypes {
     | '/_app/admin/settings'
     | '/_app/admin/users'
     | '/_app/portal/documents'
-    | '/_app/portal/todos'
+    | '/_app/portal/issues'
     | '/_app/portal/'
     | '/_app/admin/users/groups'
-    | '/_app/portal/documents/$docId'
-    | '/_app/portal/documents/new'
-    | '/_app/portal/todos/$todoId'
+    | '/_app/portal/issues/$issueId'
     | '/_app/admin/users/'
-    | '/_app/portal/documents/'
-    | '/_app/portal/todos/'
+    | '/_app/portal/issues/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   DeniedRoute: typeof DeniedRoute
+  ErrorRoute: typeof ErrorRoute
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
   TotpVerifyRoute: typeof TotpVerifyRoute
@@ -342,6 +315,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/error': {
+      id: '/error'
+      path: '/error'
+      fullPath: '/error'
+      preLoaderRoute: typeof ErrorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/denied': {
@@ -379,11 +359,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPortalIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/portal/todos': {
-      id: '/_app/portal/todos'
-      path: '/portal/todos'
-      fullPath: '/portal/todos'
-      preLoaderRoute: typeof AppPortalTodosRouteImport
+    '/_app/portal/issues': {
+      id: '/_app/portal/issues'
+      path: '/portal/issues'
+      fullPath: '/portal/issues'
+      preLoaderRoute: typeof AppPortalIssuesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/portal/documents': {
@@ -421,19 +401,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminAuditRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/_app/portal/todos/': {
-      id: '/_app/portal/todos/'
+    '/_app/portal/issues/': {
+      id: '/_app/portal/issues/'
       path: '/'
-      fullPath: '/portal/todos/'
-      preLoaderRoute: typeof AppPortalTodosIndexRouteImport
-      parentRoute: typeof AppPortalTodosRoute
-    }
-    '/_app/portal/documents/': {
-      id: '/_app/portal/documents/'
-      path: '/'
-      fullPath: '/portal/documents/'
-      preLoaderRoute: typeof AppPortalDocumentsIndexRouteImport
-      parentRoute: typeof AppPortalDocumentsRoute
+      fullPath: '/portal/issues/'
+      preLoaderRoute: typeof AppPortalIssuesIndexRouteImport
+      parentRoute: typeof AppPortalIssuesRoute
     }
     '/_app/admin/users/': {
       id: '/_app/admin/users/'
@@ -442,26 +415,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersIndexRouteImport
       parentRoute: typeof AppAdminUsersRoute
     }
-    '/_app/portal/todos/$todoId': {
-      id: '/_app/portal/todos/$todoId'
-      path: '/$todoId'
-      fullPath: '/portal/todos/$todoId'
-      preLoaderRoute: typeof AppPortalTodosTodoIdRouteImport
-      parentRoute: typeof AppPortalTodosRoute
-    }
-    '/_app/portal/documents/new': {
-      id: '/_app/portal/documents/new'
-      path: '/new'
-      fullPath: '/portal/documents/new'
-      preLoaderRoute: typeof AppPortalDocumentsNewRouteImport
-      parentRoute: typeof AppPortalDocumentsRoute
-    }
-    '/_app/portal/documents/$docId': {
-      id: '/_app/portal/documents/$docId'
-      path: '/$docId'
-      fullPath: '/portal/documents/$docId'
-      preLoaderRoute: typeof AppPortalDocumentsDocIdRouteImport
-      parentRoute: typeof AppPortalDocumentsRoute
+    '/_app/portal/issues/$issueId': {
+      id: '/_app/portal/issues/$issueId'
+      path: '/$issueId'
+      fullPath: '/portal/issues/$issueId'
+      preLoaderRoute: typeof AppPortalIssuesIssueIdRouteImport
+      parentRoute: typeof AppPortalIssuesRoute
     }
     '/_app/admin/users/groups': {
       id: '/_app/admin/users/groups'
@@ -505,46 +464,31 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
   AppAdminRouteChildren,
 )
 
-interface AppPortalDocumentsRouteChildren {
-  AppPortalDocumentsDocIdRoute: typeof AppPortalDocumentsDocIdRoute
-  AppPortalDocumentsNewRoute: typeof AppPortalDocumentsNewRoute
-  AppPortalDocumentsIndexRoute: typeof AppPortalDocumentsIndexRoute
+interface AppPortalIssuesRouteChildren {
+  AppPortalIssuesIssueIdRoute: typeof AppPortalIssuesIssueIdRoute
+  AppPortalIssuesIndexRoute: typeof AppPortalIssuesIndexRoute
 }
 
-const AppPortalDocumentsRouteChildren: AppPortalDocumentsRouteChildren = {
-  AppPortalDocumentsDocIdRoute: AppPortalDocumentsDocIdRoute,
-  AppPortalDocumentsNewRoute: AppPortalDocumentsNewRoute,
-  AppPortalDocumentsIndexRoute: AppPortalDocumentsIndexRoute,
+const AppPortalIssuesRouteChildren: AppPortalIssuesRouteChildren = {
+  AppPortalIssuesIssueIdRoute: AppPortalIssuesIssueIdRoute,
+  AppPortalIssuesIndexRoute: AppPortalIssuesIndexRoute,
 }
 
-const AppPortalDocumentsRouteWithChildren =
-  AppPortalDocumentsRoute._addFileChildren(AppPortalDocumentsRouteChildren)
-
-interface AppPortalTodosRouteChildren {
-  AppPortalTodosTodoIdRoute: typeof AppPortalTodosTodoIdRoute
-  AppPortalTodosIndexRoute: typeof AppPortalTodosIndexRoute
-}
-
-const AppPortalTodosRouteChildren: AppPortalTodosRouteChildren = {
-  AppPortalTodosTodoIdRoute: AppPortalTodosTodoIdRoute,
-  AppPortalTodosIndexRoute: AppPortalTodosIndexRoute,
-}
-
-const AppPortalTodosRouteWithChildren = AppPortalTodosRoute._addFileChildren(
-  AppPortalTodosRouteChildren,
+const AppPortalIssuesRouteWithChildren = AppPortalIssuesRoute._addFileChildren(
+  AppPortalIssuesRouteChildren,
 )
 
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRouteWithChildren
-  AppPortalDocumentsRoute: typeof AppPortalDocumentsRouteWithChildren
-  AppPortalTodosRoute: typeof AppPortalTodosRouteWithChildren
+  AppPortalDocumentsRoute: typeof AppPortalDocumentsRoute
+  AppPortalIssuesRoute: typeof AppPortalIssuesRouteWithChildren
   AppPortalIndexRoute: typeof AppPortalIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRouteWithChildren,
-  AppPortalDocumentsRoute: AppPortalDocumentsRouteWithChildren,
-  AppPortalTodosRoute: AppPortalTodosRouteWithChildren,
+  AppPortalDocumentsRoute: AppPortalDocumentsRoute,
+  AppPortalIssuesRoute: AppPortalIssuesRouteWithChildren,
   AppPortalIndexRoute: AppPortalIndexRoute,
 }
 
@@ -554,6 +498,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   DeniedRoute: DeniedRoute,
+  ErrorRoute: ErrorRoute,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
   TotpVerifyRoute: TotpVerifyRoute,

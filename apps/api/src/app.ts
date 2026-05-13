@@ -2,7 +2,7 @@ import type { Config } from "./config";
 import type { AppDatabase } from "./db";
 import type { Logger } from "./shared/lib/logger";
 import type { AppEnv } from "./shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
@@ -11,6 +11,7 @@ import { initPkceStore, logDefaultAdmins } from "./modules/account/auth/auth.ser
 import { startAuditRetentionSweep } from "./modules/audit";
 import { setAuditLogger } from "./modules/audit/audit.service";
 import { bootstrapEncryption } from "./modules/encryption";
+import { initFileModule, startFileGcSweep } from "./modules/file";
 import { protectedRoutes, publicRoutes, setupRoutes } from "./routes";
 import { getAuthConfig, seedSettingsFromEnv } from "./shared/lib/app-config";
 import { createLogger } from "./shared/lib/logger";
@@ -35,7 +36,7 @@ export interface BootstrapResult {
   /** Logger */
   readonly logger: Logger;
   /** Close DB connection (if unlocked). Call on shutdown. */
-  readonly closeDb: () => void;
+  readonly closeDb: () => Promise<void>;
 }
 
 // ─── Bootstrap ───
@@ -52,16 +53,18 @@ export async function bootstrap(): Promise<BootstrapResult> {
 
   // Mutable reference for hot-swapping locked → unlocked
   let currentApp: { fetch: (req: Request, env?: Record<string, unknown>) => Response | Promise<Response> };
-  let closeDb: () => void = () => {};
+  let closeDb: () => Promise<void> = async () => {};
 
   async function onDbReady(db: AppDatabase) {
     // Close the previous database handle (no-op on first call) so DEK rotation
     // can hot-swap the live db without leaking the old encrypted handle.
-    closeDb();
+    await closeDb();
     initPkceStore(db);
     currentApp = await buildFullApp({ config, db, logger });
     logDefaultAdmins(await getAuthConfig(db, config), logger);
-    closeDb = () => db.close();
+    closeDb = async () => {
+      await db.close();
+    };
     logger.info("system fully operational");
   }
 
@@ -79,20 +82,10 @@ export async function bootstrap(): Promise<BootstrapResult> {
     config,
     logger,
     closeDb: () => closeDb(),
-  };
+  } as BootstrapResult;
 }
 
 // ─── Shared installers ───
-
-function newApi(): OpenAPIHono<AppEnv> {
-  return new OpenAPIHono<AppEnv>({
-    defaultHook: (result, c) => {
-      if (!result.success) {
-        return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "Validation failed", details: result.error.flatten() } }, 422);
-      }
-    },
-  });
-}
 
 // CORS_ORIGIN may be a comma-separated list. In development with no value,
 // allow same-origin requests (any host) — dev usually goes through nsl which
@@ -106,7 +99,7 @@ function resolveCorsOrigin(config: Config): string | string[] {
 }
 
 function installCommonMiddleware(
-  api: OpenAPIHono<AppEnv>,
+  api: Hono<AppEnv>,
   { config, logger, db }: { config: Config; logger: Logger; db?: AppDatabase },
 ): void {
   api.use("*", requestId());
@@ -126,12 +119,14 @@ function installCommonMiddleware(
 // ─── Full App (unlocked) ───
 
 export async function buildFullApp({ config, db, logger }: AppDeps) {
-  const api = newApi();
+  const api = new Hono<AppEnv>();
   installCommonMiddleware(api, { config, logger, db });
 
   setAuditLogger(logger);
   await seedSettingsFromEnv(db, config);
   startAuditRetentionSweep(db, config, logger);
+  initFileModule(config);
+  startFileGcSweep(db, config, logger);
 
   api.route("/", publicRoutes());
   api.route("/", protectedRoutes());
@@ -144,7 +139,7 @@ export async function buildFullApp({ config, db, logger }: AppDeps) {
 // ─── Locked App (setup / unlock) ───
 
 export function buildLockedApp(config: Config, logger: Logger) {
-  const api = newApi();
+  const api = new Hono<AppEnv>();
   installCommonMiddleware(api, { config, logger });
 
   setAuditLogger(logger);
@@ -163,33 +158,22 @@ export function buildLockedApp(config: Config, logger: Logger) {
 
 // ─── Outer shell (shared by full & locked) ───
 
-function buildOuterApp(api: OpenAPIHono<AppEnv>, config: Config) {
-  const app = new OpenAPIHono<AppEnv>();
+function buildOuterApp(api: Hono<AppEnv>, config: Config) {
+  const app = new Hono<AppEnv>();
   const base = config.BASE_PATH;
 
   // Security headers for every response (API JSON + static SPA HTML/JS/CSS).
   // SPA bundles are hashed under BASE_PATH; styles need 'unsafe-inline' for
-  // Tailwind v4 + base-ui runtime style injection. Scripts stay strict 'self'.
-  // img data:/blob: covers QR codes and inline SVGs.
-  //
-  // The Scalar API-reference page at `/api/docs` runs an inline fetch-patch
-  // and pulls the Scalar bundle from a CDN, which the strict policy below
-  // would block. Branch into a relaxed-CSP variant just for that admin-only
-  // route — its handler emits its own per-request Content-Security-Policy
-  // (nonce + jsdelivr whitelist). All other security headers stay identical.
-  const baseHeadersOptions = {
+  // Tailwind v4 + base-ui runtime style injection. img data:/blob: covers
+  // QR codes and inline SVGs. frame-ancestors 'self' lets the SPA preview
+  // PDFs via same-origin <iframe>; HSTS is left to the reverse proxy.
+  app.use("*", secureHeaders({
     referrerPolicy: "strict-origin-when-cross-origin",
     crossOriginOpenerPolicy: "same-origin",
     crossOriginResourcePolicy: "same-origin",
-    xFrameOptions: "DENY",
+    xFrameOptions: "SAMEORIGIN",
     xContentTypeOptions: "nosniff",
-    // HSTS deliberately disabled: pinning forces every future visit to https
-    // and bricks LAN/dev TLS-termination edge cases. Operators that need it
-    // should set it at the reverse proxy.
     strictTransportSecurity: false,
-  } as const;
-  const strictSecureHeaders = secureHeaders({
-    ...baseHeadersOptions,
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
@@ -197,21 +181,13 @@ function buildOuterApp(api: OpenAPIHono<AppEnv>, config: Config) {
       imgSrc: ["'self'", "data:", "blob:"],
       fontSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
-      frameAncestors: ["'none'"],
+      frameAncestors: ["'self'"],
+      frameSrc: ["'self'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
       objectSrc: ["'none'"],
     },
-  });
-  // For the docs route we skip the secureHeaders CSP; the handler writes its
-  // own nonce-gated policy and that header survives because nothing else
-  // rewrites it post-handler.
-  const docsSecureHeaders = secureHeaders(baseHeadersOptions);
-  const DOCS_PATH = `${base}/api/docs`;
-  app.use("*", async (c, next) => {
-    const handler = c.req.path === DOCS_PATH ? docsSecureHeaders : strictSecureHeaders;
-    return handler(c, next);
-  });
+  }));
 
   // When BASE_PATH is set, redirect bare "/" to "${base}/" so a request to the
   // origin lands on the SPA. With no base the SPA already owns "/" — skip the

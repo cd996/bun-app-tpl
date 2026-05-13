@@ -8,11 +8,10 @@
 # under `/backups`, and prunes anything older than $RETENTION_DAYS.
 #
 # Required env in `.env` (or your secret store):
-#   SERVICE_TOKEN          long-lived bearer (≥32 chars). Set the SAME value
-#                          on the API service via the `SERVICE_TOKEN` env
-#                          var; the API enforces a constant-time match on
-#                          /api/backup/export-via-token and /api/metrics.
-#   BACKUP_RETENTION_DAYS  (optional, default 30)
+#   SERVICE_TOKEN_BACKUP    bearer (≥32 chars) gating
+#                           POST /api/backup/export-via-token. Set the
+#                           SAME value on the API service.
+#   BACKUP_RETENTION_DAYS   (optional, default 30)
 #   BACKUP_INTERVAL_SECONDS (optional, default 86400 = 24h)
 #
 # An offsite copy is encouraged: pipe the JSON to a presigned S3 URL,
@@ -30,7 +29,7 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-app}
       BASE_PATH: ${BASE_PATH:-}
-      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      SERVICE_TOKEN: ${SERVICE_TOKEN_BACKUP}
       RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
     volumes:

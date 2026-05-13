@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from "react";
 import { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
+import { storageKey } from "@/shared/lib/branding";
 
 type Theme = "light" | "dark" | "system";
 
@@ -11,7 +12,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "app-theme";
+const STORAGE_KEY = storageKey("theme");
 const isBrowser = typeof window !== "undefined";
 
 function getSystemTheme(): "light" | "dark" {

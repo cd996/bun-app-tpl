@@ -26,10 +26,9 @@ const STREAM_BATCH_SIZE = 1000;
  * Stream a backup as JSON. Returns a `ReadableStream<Uint8Array>` whose
  * chunks form a single JSON document — `{"version":1,...,"tables":{"a":[...]}}`.
  *
- * Memory cost is ~one batch (≤ STREAM_BATCH_SIZE rows × row size) instead of
- * the entire DB. This matters when the audit table is unbounded — a 100k-row
- * export with the previous in-memory `JSON.stringify(..., null, 2)` path
- * peaked at ~200 MB and could OOM on small VMs.
+ * Memory cost is ~one batch (≤ STREAM_BATCH_SIZE rows × row size), not the
+ * whole DB — important on small VMs once the audit table grows past tens
+ * of thousands of rows.
  */
 export function streamJsonBackup(db: AppDatabase, selectedModules: string[]): {
   modules: string[];
@@ -92,35 +91,4 @@ export function streamJsonBackup(db: AppDatabase, selectedModules: string[]): {
   });
 
   return { modules, body };
-}
-
-/**
- * @deprecated Held the whole DB in memory before stringifying. Kept for tests
- * that snapshot the in-memory shape; production export uses
- * {@link streamJsonBackup} instead.
- */
-export async function generateJsonBackup(db: AppDatabase, selectedModules: string[]): Promise<BackupData> {
-  const modules = resolveModulesWithDeps(selectedModules);
-  const registry = getDataModules();
-
-  const tables: Record<string, Record<string, unknown>[]> = {};
-
-  for (const modName of modules) {
-    const mod = registry[modName];
-    if (!mod)
-      continue;
-
-    for (const table of mod.tables) {
-      const tableName = getTableName(table);
-      const rows = await db.select().from(table).all();
-      tables[tableName] = rows as Record<string, unknown>[];
-    }
-  }
-
-  return {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    modules,
-    tables,
-  };
 }

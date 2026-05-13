@@ -9,7 +9,8 @@ apps/api/src/modules/settings/
   schema.ts                # `settings` table
   settings.routes.ts
   settings.service.ts
-  index.ts
+  settings.backup.ts       # backup contribution
+  index.ts                 # registers backup contribution
 ```
 
 ## Database

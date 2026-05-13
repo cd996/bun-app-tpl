@@ -1,5 +1,5 @@
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { z } from "zod";
 import { audit } from "@/modules/audit/audit.service";
 import { getClientIp } from "@/shared/lib/client-ip";
@@ -30,7 +30,7 @@ function validateSettingKey(key: string): void {
 }
 
 export function settingsRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   router.use("*", authRequired);
 

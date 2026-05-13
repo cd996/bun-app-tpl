@@ -40,7 +40,7 @@ describe("createLogger", () => {
   });
 
   test("falls back to info on an unknown LOG_LEVEL", async () => {
-    // Should not throw; the consola/pino instances both default to info.
+    // Should not throw; the pino instance and dev tee both default to info.
     const log = createLogger({ LOG_LEVEL: "trace", LOG_FILE: logFile, LOG_TO_STDOUT: false, NODE_ENV: "test" });
     log.info("fallback ok");
     await Bun.sleep(50);
@@ -63,16 +63,38 @@ describe("createLogger", () => {
     expect(content).toContain("\"f\"");
   });
 
-  test("redacts sensitive fields", async () => {
+  test("redacts sensitive fields at the top level", async () => {
     const log = createLogger({ LOG_LEVEL: "info", LOG_FILE: logFile, LOG_TO_STDOUT: false, NODE_ENV: "test" });
-    // Redact paths are `*.password` / `*.token` / `*.secret` — one level
-    // under the root. Wrap values accordingly.
     log.info({ user: { password: "secret" }, session: { token: "abc" } }, "redact-test");
     await Bun.sleep(50);
     log.flush();
     const content = readFileSync(logFile, "utf-8");
     expect(content).not.toContain("secret");
     expect(content).not.toContain("abc");
+    expect(content).toContain("REDACTED");
+  });
+
+  test("redacts sensitive fields nested below the first level", async () => {
+    // Earlier the redact paths were `*.password` / `*.token` etc. which only
+    // matched one level below the root. A nested layout like the request
+    // metadata bundle below would have leaked the cleartext credentials.
+    const log = createLogger({ LOG_LEVEL: "info", LOG_FILE: logFile, LOG_TO_STDOUT: false, NODE_ENV: "test" });
+    log.info(
+      {
+        outer: {
+          ctx: {
+            user: { password: "deep-secret-pw" },
+            api: { authorization: "Bearer deep-secret-token" },
+          },
+        },
+      },
+      "deep-redact-test",
+    );
+    await Bun.sleep(50);
+    log.flush();
+    const content = readFileSync(logFile, "utf-8");
+    expect(content).not.toContain("deep-secret-pw");
+    expect(content).not.toContain("deep-secret-token");
     expect(content).toContain("REDACTED");
   });
 });

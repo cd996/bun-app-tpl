@@ -1,13 +1,12 @@
 // Public entry for the project's markdown surface.
 //
-// `readOnly` paths render via `markdown-preview` (react-markdown + Shiki —
-// lightweight, no contenteditable footprint); editable paths mount the
-// Milkdown-based WYSIWYG editor that round-trips markdown via its built-in
-// remark serialiser. Both are React.lazy so the route-shell stays small
-// for users that never open one.
-//
-// External shape is unchanged from earlier editor revisions; callers in
-// documents / todos do not need to migrate.
+// Read-only paths render via `markdown-preview` (react-markdown wrapped
+// in a `.ProseMirror` element so it shares the editor's CSS — same
+// font, line height, spacing) so the surface tracks content height
+// without an embedded scroll container. Editable paths mount the
+// Milkdown-based WYSIWYG editor that round-trips markdown via its
+// built-in remark serialiser. Both are React.lazy so the route-shell
+// stays small for users that never open one.
 
 import type { ComponentProps } from "react";
 import { lazy, Suspense } from "react";
@@ -24,6 +23,7 @@ interface MarkdownEditorProps {
   readonly className?: string | undefined;
   readonly placeholder?: string | undefined;
   readonly minHeight?: number | undefined;
+  readonly floatingToolbar?: boolean | undefined;
 }
 
 function Fallback() {
@@ -38,8 +38,6 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       </Suspense>
     );
   }
-  // Drop `readOnly` from the editor props — the WYSIWYG mode is always
-  // editable. Forward the rest 1:1.
   const editorProps: ComponentProps<typeof LazyMilkdownEditor> = {
     value: props.value,
     defaultValue: props.defaultValue,
@@ -48,6 +46,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
     className: props.className,
     placeholder: props.placeholder,
     minHeight: props.minHeight,
+    floatingToolbar: props.floatingToolbar,
   };
   return (
     <Suspense fallback={<Fallback />}>

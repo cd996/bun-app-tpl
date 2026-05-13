@@ -1,0 +1,389 @@
+{
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "auth": {
+    "logout": "Logout"
+  },
+  "totp": {
+    "title": "Two-Factor Authentication",
+    "description": "Manage your TOTP devices for two-factor authentication.",
+    "noDevices": "No TOTP devices configured.",
+    "addDevice": "Add Device",
+    "deviceName": "Device Name",
+    "deviceNamePlaceholder": "e.g. Phone, Yubikey",
+    "scanQr": "Scan the QR code with your authenticator app, then enter the 6-digit code to verify.",
+    "verifyCode": "Verification Code",
+    "verifyCodePlaceholder": "000000",
+    "verify": "Verify",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to remove this device?",
+    "verified": "Verified",
+    "unverified": "Unverified",
+    "addSuccess": "Device added and verified.",
+    "deleteSuccess": "Device removed.",
+    "verifyFailed": "Invalid code, please try again.",
+    "loginTitle": "Two-Factor Verification",
+    "loginDescription": "Enter the 6-digit code from your authenticator app.",
+    "loginVerify": "Verify",
+    "loginError": "Invalid code, please try again.",
+    "loginExpired": "Session expired, please login again.",
+    "loginBack": "Back to Login",
+    "cantScan": "Can't scan the QR code?",
+    "manualEntry": "Enter this key manually in your authenticator app:",
+    "lostDevice": "If you lose your authenticator device, contact your administrator. There is no automated recovery — we recommend enrolling more than one device.",
+    "qrAlt": "TOTP QR code",
+    "verifying": "Verifying..."
+  },
+  "profile": {
+    "username": "Username",
+    "email": "Email",
+    "role": "Role",
+    "groups": "Groups",
+    "roleAdmin": "Admin",
+    "roleUser": "User"
+  },
+  "settings": {
+    "tabProfile": "Profile",
+    "tabSecurity": "Security",
+    "language": "Language",
+    "theme": "Appearance",
+    "encrypted": "Encrypted",
+    "plaintext": "Plaintext",
+    "saving": "Saving...",
+    "noSettings": "No settings configured.",
+    "allSettingsRaw": "Raw Settings",
+    "col": {
+      "key": "Key",
+      "value": "Value",
+      "encrypted": "Encryption",
+      "updatedAt": "Updated",
+      "actions": "Actions"
+    },
+    "tabs": {
+      "general": "General",
+      "auth": "Authentication",
+      "smtp": "SMTP",
+      "webhook": "Webhooks",
+      "encryption": "Encryption & Backup"
+    },
+    "general": {
+      "title": "General",
+      "description": "Basic platform settings.",
+      "fieldOidcLogoutUrl": "OIDC Logout URL"
+    },
+    "encryption": {
+      "title": "Encryption & Backup",
+      "description": "Manage database encryption and data backup.",
+      "changePassword": "Change Master Password",
+      "currentPassword": "Current Password",
+      "currentPasswordPlaceholder": "Enter your current password",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "Enter new password (12+ chars)",
+      "confirmPassword": "Confirm New Password",
+      "confirmPasswordPlaceholder": "Re-enter new password",
+      "changeButton": "Change Password",
+      "wrongPassword": "Current password is incorrect.",
+      "confirmTitle": "Change Master Password?",
+      "confirmDescription": "This will change the encryption master password. You must use the new password to unlock the system after the next restart. Make sure you remember it.",
+      "confirmButton": "Confirm Change",
+      "changeSuccess": "Master password changed successfully. Use the new password on next restart.",
+      "changeNote": "Changing the password re-encrypts the database key with a new derived key pair. The database itself is not re-encrypted. Takes effect on next unlock.",
+      "changeFailed": "Failed to change password",
+      "disabled": "Database encryption is disabled (DB_ENCRYPTION=false). Encryption settings cannot be modified in this mode.",
+      "export": {
+        "title": "Data Export",
+        "description": "Export selected modules as a JSON backup file. Audit logs, sessions, and temporary data are excluded.",
+        "button": "Export Database",
+        "selectModules": "Select Modules",
+        "password": "Master Password",
+        "passwordPlaceholder": "Enter your master password to verify",
+        "wrongPassword": "Password is incorrect.",
+        "exporting": "Exporting...",
+        "success": "Database exported successfully.",
+        "failed": "Export failed",
+        "noEncryption": "Export selected modules as a JSON backup file. Audit logs, sessions, and temporary data are excluded.",
+        "confirmTitle": "Export Database?",
+        "confirmDescription": "This will generate and download a JSON backup of the selected modules. Audit logs and session data will be excluded.",
+        "confirmButton": "Confirm Export"
+      },
+      "import": {
+        "title": "Data Import",
+        "description": "Import data from a previously exported JSON backup file. This will overwrite existing data in the affected modules.",
+        "button": "Import Database",
+        "file": "Backup File",
+        "detectedModules": "Modules in file",
+        "password": "Master Password",
+        "passwordPlaceholder": "Enter your master password to verify",
+        "wrongPassword": "Password is incorrect.",
+        "importing": "Importing...",
+        "success": "Import completed. {{tables}} tables, {{rows}} rows imported.",
+        "failed": "Import failed",
+        "invalidFormat": "Invalid backup file format.",
+        "invalidJson": "File is not valid JSON.",
+        "confirmTitle": "Import Database?",
+        "confirmDescription": "This is a destructive operation. All existing data in the following modules will be replaced with the imported data:",
+        "confirmButton": "Confirm Import",
+        "includeUsersLabel": "Restore users, groups, and preferences",
+        "includeUsersHint": "Overwrites the live user table. Required for full disaster recovery / migration; leave off to merge only domain data into an existing tenant. Your own admin row must remain present and active in the backup, or the restore is rejected.",
+        "confirmIncludeUsersOn": "Users, groups, and preferences WILL be overwritten.",
+        "confirmIncludeUsersOff": "Users, groups, and preferences will be skipped."
+      },
+      "modules": {
+        "users": "Users & Groups",
+        "policies": "Policies",
+        "documents": "Documents",
+        "issues": "Issues",
+        "settings": "Settings"
+      }
+    },
+    "oauth": {
+      "title": "OAuth / OIDC",
+      "description": "Configure OAuth client credentials and OIDC endpoint settings.",
+      "fieldClientId": "Client ID",
+      "fieldClientSecret": "Client Secret",
+      "fieldIssuer": "Issuer URL",
+      "fieldAuthorizeUrl": "Authorize URL",
+      "fieldTokenUrl": "Token URL",
+      "fieldUserinfoUrl": "Userinfo URL",
+      "fieldCallbackUrl": "Callback URL",
+      "fieldPkce": "PKCE Enabled",
+      "fieldLogoutUrl": "OIDC Logout URL"
+    },
+    "auth": {
+      "title": "Authentication",
+      "description": "Configure session and admin settings.",
+      "sessionTitle": "Session & Admin",
+      "sessionDescription": "Configure session lifetime and default administrators.",
+      "fieldSessionMaxAge": "Session Max Age (seconds)",
+      "fieldDefaultAdmin": "Default Admin (comma-separated)"
+    },
+    "smtp": {
+      "title": "Email (SMTP)",
+      "description": "Configure SMTP server for sending notification emails.",
+      "enable": "Enable",
+      "serverConfig": "SMTP Server",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "testSent": "Test email request submitted.",
+      "fieldHost": "SMTP Host",
+      "fieldPort": "Port",
+      "fieldUsername": "Username",
+      "fieldPassword": "Password",
+      "fieldFromAddress": "From Address",
+      "fieldFromName": "From Name"
+    },
+    "webhook": {
+      "title": "Webhooks",
+      "description": "Configure webhook endpoints to receive event notifications.",
+      "add": "Add Webhook",
+      "addTitle": "Add Webhook",
+      "addDescription": "Configure a new webhook endpoint.",
+      "noWebhooks": "No webhooks configured. Click \"Add Webhook\" to get started.",
+      "colName": "Name",
+      "colUrl": "URL",
+      "colEvents": "Events",
+      "colSecret": "Secret",
+      "fieldSecret": "Signing Secret",
+      "secretPlaceholder": "Optional signing secret",
+      "allEvents": "All events",
+      "noSecret": "None",
+      "eventsHint": "Comma-separated event types, or * for all events.",
+      "allEventsPlaceholder": "* (all events)"
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "description": "Sign in to access your applications and services.",
+    "button": "Sign in"
+  },
+  "common": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "prev": "Previous",
+    "next": "Next",
+    "add": "Add",
+    "back": "Back",
+    "close": "Close",
+    "copy": "Copy",
+    "refresh": "Refresh",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "submitting": "Submitting...",
+    "stillLoading": "Still loading...",
+    "errorDetails": "Error details",
+    "networkError": {
+      "title": "Couldn't reach the server",
+      "description": "There was a problem connecting to the server. Check your network and try again."
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "We couldn't find the page you were looking for."
+    },
+    "error": {
+      "loadFailed": "Failed to load data",
+      "deleteFailed": "Failed to delete",
+      "operationFailed": "Operation failed",
+      "saveFailed": "Failed to save",
+      "uploadFailed": "Upload failed",
+      "systemUnavailable": "System unavailable. Please try again later.",
+      "dbError": "Database Error",
+      "dbErrorBody": "The database is currently unavailable. The system will keep retrying automatically."
+    }
+  },
+  "editor": {
+    "bold": "Bold (Ctrl+B)",
+    "italic": "Italic (Ctrl+I)",
+    "strikethrough": "Strikethrough",
+    "inlineCode": "Inline code",
+    "link": "Link (Ctrl+K)",
+    "bulletList": "Bullet list",
+    "orderedList": "Ordered list",
+    "taskList": "Task list",
+    "quote": "Quote",
+    "codeBlock": "Code block",
+    "table": "Table",
+    "horizontalRule": "Horizontal rule",
+    "write": "Write",
+    "preview": "Preview",
+    "heading": "Heading",
+    "nothingToPreview": "Nothing to preview"
+  },
+  "nav": {
+    "portal": "Portal",
+    "users": "Users",
+    "policies": "Policies",
+    "myIssues": "My Issues",
+    "documents": "Documents",
+    "audit": "Audit Log",
+    "settings": "Settings",
+    "platformSettings": "Settings",
+    "security": "Security",
+    "home": "Home"
+  },
+  "page": {
+    "portal": {
+      "title": "Portal",
+      "description": "Welcome to your workspace."
+    },
+    "users": {
+      "title": "User Management",
+      "description": "Manage platform users and their roles."
+    },
+    "policies": {
+      "title": "Policy Management",
+      "description": "Configure Zanzibar authorization tuples."
+    },
+    "audit": {
+      "title": "Audit Log",
+      "description": "View system audit trail and activity logs."
+    },
+    "settings": {
+      "title": "System Settings",
+      "description": "Manage authentication, email, webhooks, and other platform configuration."
+    },
+    "myIssues": {
+      "title": "My Issues",
+      "description": "View and manage issues assigned to you."
+    },
+    "myDocuments": {
+      "title": "My Documents",
+      "description": "Create and manage your documents."
+    }
+  },
+  "portal": {
+    "welcome": "Welcome, {{name}}",
+    "tile": {
+      "myIssuesDescription": "View and manage your issues.",
+      "documentsDescription": "Browse and edit documents."
+    }
+  },
+  "encryption": {
+    "setup": {
+      "title": "System Initialization",
+      "description": "Set up database encryption to protect your data.",
+      "generating": "Deriving key and initializing...",
+      "initFailed": "Initialization failed",
+      "step1": {
+        "title": "Set Master Password",
+        "description": "Choose a strong password to encrypt the database. This password will be required each time the system restarts.",
+        "bootstrapToken": "Bootstrap Token",
+        "bootstrapTokenPlaceholder": "Paste the token from server logs",
+        "bootstrapTokenHint": "Look up BOOTSTRAP_TOKEN in the server's stderr at startup, or read it from <data dir>/bootstrap-token.txt. It is auto-generated each boot and removed once setup completes.",
+        "password": "Master Password",
+        "passwordPlaceholder": "Enter a strong password (12+ characters)",
+        "passwordConfirm": "Confirm Password",
+        "passwordConfirmPlaceholder": "Re-enter your password",
+        "passwordTooShort": "Password must be at least 12 characters",
+        "passwordMismatch": "Passwords do not match",
+        "button": "Initialize Encryption"
+      },
+      "step2": {
+        "warning": "Save your backup key!",
+        "warningDetail": "If you forget your password, this backup key is the only way to unlock the database. Store it securely.",
+        "label": "Backup Key (for password recovery)",
+        "copied": "Copied to clipboard",
+        "confirm": "I have securely saved the backup key",
+        "finalize": "Complete Setup",
+        "exportRequired": "Download or copy the backup key before continuing.",
+        "showKey": "Show key again"
+      },
+      "step3": {
+        "title": "Initialization Complete",
+        "description": "Database encryption is active. Click below to continue."
+      }
+    },
+    "unlock": {
+      "title": "System Locked",
+      "description": "Enter your master password to unlock the system.",
+      "modePassword": "Password",
+      "modeKeyFile": "Backup Key",
+      "passwordLabel": "Master Password",
+      "passwordPlaceholder": "Enter your master password",
+      "keyLabel": "Private Key (hex)",
+      "keyPlaceholder": "Paste your hex-encoded backup key...",
+      "uploadFile": "Upload Key File",
+      "button": "Unlock",
+      "unlocking": "Unlocking...",
+      "invalidKey": "Invalid password or key. Please try again.",
+      "localNote": "Decryption is performed locally in your browser. Your password and key never leave this device.",
+      "rateLimited": "Too many unlock attempts. Please wait a few minutes and try again.",
+      "systemUnavailable": "Database is unavailable. Contact an administrator.",
+      "metaMissing": "Encryption metadata is missing on this server.",
+      "notLocked": "System is not locked."
+    }
+  },
+  "denied": {
+    "requestId": "Request ID",
+    "backToPortal": "Back to Portal",
+    "switchAccount": "Switch Account",
+    "signInDifferent": "Sign in with a different account",
+    "signOut": "Sign Out",
+    "requestAccess": "Request access",
+    "no_viewer_relation": {
+      "title": "Access Denied",
+      "description": "You do not have permission to access this resource. Please contact your administrator to request access."
+    },
+    "user_not_registered": {
+      "title": "User Not Registered",
+      "description": "Your account is not registered in the system. Please contact your administrator to get an invitation."
+    },
+    "user_disabled": {
+      "title": "Account Disabled",
+      "description": "Your account has been disabled. Please contact your administrator for assistance."
+    }
+  },
+  "setup": {
+    "downloaded": "Downloaded {{filename}}",
+    "continueToLogin": "Continue to Login",
+    "showKey": "Show key again"
+  }
+}

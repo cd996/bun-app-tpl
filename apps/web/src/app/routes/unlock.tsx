@@ -275,7 +275,7 @@ function UnlockPage() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-svh items-center justify-center">
         <div className="text-muted-foreground">{t("common.loading", "Loading...")}</div>
       </div>
     );
@@ -283,7 +283,7 @@ function UnlockPage() {
 
   if (bundleError && !bundleReady) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
         <div className="mx-auto w-full max-w-md text-center space-y-4">
           <Logo className="mx-auto size-10" />
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-destructive/10">
@@ -298,7 +298,7 @@ function UnlockPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-8 text-center">
           <Logo className="mx-auto size-10 mb-3" />

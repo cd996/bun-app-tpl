@@ -60,8 +60,8 @@ describe("audit()", () => {
     const id = await audit(db, {
       actorId: "u_1",
       actorName: "alice",
-      action: "todos.create",
-      resourceType: "todo",
+      action: "issues.create",
+      resourceType: "issue",
       resourceId: "t_42",
       resourceName: "buy milk",
       detail: { priority: "high" },
@@ -75,8 +75,8 @@ describe("audit()", () => {
     expect(row).toBeDefined();
     expect(row!.actorId).toBe("u_1");
     expect(row!.actorName).toBe("alice");
-    expect(row!.action).toBe("todos.create");
-    expect(row!.resourceType).toBe("todo");
+    expect(row!.action).toBe("issues.create");
+    expect(row!.resourceType).toBe("issue");
     expect(row!.resourceId).toBe("t_42");
     expect(row!.resourceName).toBe("buy milk");
     // Detail is JSON-encoded; round-trip to verify shape.
@@ -162,8 +162,8 @@ describe("listAuditEvents", () => {
     // Seed three events spanning two actors / two actions / two timestamps.
     const base = Date.parse("2026-05-01T00:00:00Z");
     const rows = [
-      { id: "e_1", actorId: "u_1", action: "todos.create", resourceType: "todo", resourceId: "t_1", result: "success", createdAt: new Date(base).toISOString() },
-      { id: "e_2", actorId: "u_2", action: "todos.create", resourceType: "todo", resourceId: "t_2", result: "failure", createdAt: new Date(base + 1000).toISOString() },
+      { id: "e_1", actorId: "u_1", action: "issues.create", resourceType: "issue", resourceId: "t_1", result: "success", createdAt: new Date(base).toISOString() },
+      { id: "e_2", actorId: "u_2", action: "issues.create", resourceType: "issue", resourceId: "t_2", result: "failure", createdAt: new Date(base + 1000).toISOString() },
       { id: "e_3", actorId: "u_1", action: "auth.login", resourceType: "session", resourceId: "s_1", result: "success", createdAt: new Date(base + 2000).toISOString() },
     ];
     for (const r of rows) {
@@ -186,18 +186,18 @@ describe("listAuditEvents", () => {
   });
 
   test("filters by exact action", async () => {
-    const r = await listAuditEvents(db, { action: "todos.create" });
+    const r = await listAuditEvents(db, { action: "issues.create" });
     expect(r.total).toBe(2);
   });
 
   test("filters by action prefix using a trailing wildcard", async () => {
-    const r = await listAuditEvents(db, { action: "todos.*" });
+    const r = await listAuditEvents(db, { action: "issues.*" });
     expect(r.total).toBe(2);
-    expect(r.data.every(d => d.action.startsWith("todos."))).toBe(true);
+    expect(r.data.every(d => d.action.startsWith("issues."))).toBe(true);
   });
 
   test("filters by resourceType / resourceId", async () => {
-    const r1 = await listAuditEvents(db, { resourceType: "todo" });
+    const r1 = await listAuditEvents(db, { resourceType: "issue" });
     expect(r1.total).toBe(2);
     const r2 = await listAuditEvents(db, { resourceId: "t_2" });
     expect(r2.total).toBe(1);

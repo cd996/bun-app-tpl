@@ -2,6 +2,7 @@ import process from "node:process";
 import { bootstrap } from "./app";
 import { BUILD_INFO } from "./build-info";
 import { stopAuditRetentionSweep } from "./modules/audit";
+import { stopFileGcSweep } from "./modules/file";
 import { acquirePidLock, releasePidLock } from "./pid-lock";
 
 // `--version` (or `-v`) prints the build identifiers and exits before any
@@ -72,6 +73,13 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
     }
 
     try {
+      stopFileGcSweep();
+    }
+    catch (err) {
+      logger.error({ err }, "stopFileGcSweep failed");
+    }
+
+    try {
       logger.flush();
     }
     catch {
@@ -79,7 +87,7 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
     }
 
     try {
-      closeDb();
+      await closeDb();
     }
     catch (err) {
       // Logger may have flushed; emit through stderr as a last resort.
@@ -115,11 +123,15 @@ if (process.argv.includes("--version") || process.argv.includes("-v")) {
     }
     catch {}
     try {
+      stopFileGcSweep();
+    }
+    catch {}
+    try {
       logger.flush();
     }
     catch {}
     try {
-      closeDb();
+      await closeDb();
     }
     catch {}
     releasePidLock();

@@ -29,7 +29,7 @@ export function FullPageLoader({ onRetry }: FullPageLoaderProps) {
     <div
       role="status"
       aria-live="polite"
-      className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background"
+      className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background"
     >
       <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
       <span className="text-sm text-muted-foreground">{t("common.loading")}</span>

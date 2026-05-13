@@ -2,9 +2,9 @@
 
 A Bun monorepo template for OAuth-backed internal workspaces. Ships with:
 
-- **API** — Hono + OpenAPI on Bun, SQLite via Drizzle, optional ECIES at-rest encryption.
+- **API** — Hono on Bun, SQLite via Drizzle, optional ECIES at-rest encryption.
 - **Web** — React 19 + TanStack Router + Tailwind v4, file-based routes, dual EN/ZH i18n.
-- **Modules** — account/auth (OAuth + TOTP), groups, Zanzibar relation tuples, documents, todos, settings, audit logs, encryption admin, JSON backup.
+- **Modules** — account/auth (OAuth + TOTP), groups, Zanzibar relation tuples, `item` base + `file` storage, documents, issues, settings, audit logs, encryption admin, JSON backup.
 - **Build** — single Bun executable via `scripts/compile.ts`.
 
 ## Quick start
@@ -12,21 +12,18 @@ A Bun monorepo template for OAuth-backed internal workspaces. Ships with:
 ```bash
 bun install
 cp .env.example .env       # uncomment the "Bundled dex IdP" block
-
-# terminal 1
-bun run dev:dex            # starts the bundled dex IdP only
-
-# terminal 2
-bun run dev                # starts web + api, reads OAUTH_* from .env
+bun run dev:all            # starts dex + web + api in one process group
 ```
 
-Open the URL printed by `bun run dev` (e.g. `http://app.localhost:3355`) — you'll be redirected to the setup flow, then to login. Use `admin@zzci.cc` / `zzci` to sign in (configured in the bundled dex). The first matching login becomes admin per `DEFAULT_ADMIN`.
+Open the URL printed by `bun run dev:all` (e.g. `http://app.localhost:3355`). Sign in with `admin@example.com` / `admin` — the bundled dex's static user. The first matching login becomes admin per `DEFAULT_ADMIN`.
 
-If you have your own OAuth/OIDC provider, point `OAUTH_*` in `.env` at it and skip `dev:dex` entirely. The dex script only manages the IdP — the app's OAuth credentials always come from `.env`.
+Already have an OAuth/OIDC provider? Point `OAUTH_ISSUER` at it in `.env` and use `bun run dev` instead — `dev:all` detects an external issuer and bows out so it doesn't fight your IdP.
 
-### First-run setup
+### First-run setup (only when `DB_ENCRYPTION=true`)
 
-1. Visit the URL above; you'll land on `/<base>/setup`.
+`DB_ENCRYPTION` defaults to `false` in dev — `bun run dev:all` lands you on login directly. If you enable encryption (recommended for production deploys), the first boot adds:
+
+1. Visit `/<base>/setup`.
 2. Paste the bootstrap token. It is auto-generated at every boot and surfaced via stderr / `<data dir>/bootstrap-token.txt` while the system is in setup mode; both go away once init succeeds.
 3. Choose a master password — this derives the master keypair that wraps the data-encryption key (DEK).
 4. Save the recovery key file (`<APP_NAME>-master-key.txt`).
@@ -41,28 +38,33 @@ If you have your own OAuth/OIDC provider, point `OAUTH_*` in `.env` at it and sk
 ## Commands
 
 ```bash
-bun run dev          # Vite dev server (web + API via @hono/vite-dev-server)
-bun run dev:dex      # Same, but with a bundled dex IdP wired up automatically
-bun run build        # Build all packages
-bun run lint         # ESLint
-bun run typecheck    # tsc --noEmit
-bun run test         # Unit tests (bun:test + vitest)
-bun run test:e2e     # Live e2e: dex + API + encrypted DB + every module
-bun run check        # lint + typecheck + test + build
-bun run compile      # Single-binary build (Bun executable)
-bun run clean        # Remove build artifacts
+bun run dev            # Vite dev server (web + API via @hono/vite-dev-server)
+bun run dev:all        # dev + bundled dex IdP, one process group
+bun run dev:dex        # just the bundled dex IdP (use when running dev in another terminal)
+bun run rebrand        # rewrite manifests + .env defaults for a fork
+bun run module:new     # scaffold a new content sub-type module on top of `item` + `file`
+bun run build          # Build all packages
+bun run lint           # ESLint
+bun run typecheck      # tsc --noEmit
+bun run test           # Unit tests (bun:test + vitest)
+bun run test:e2e       # Live e2e: dex + API + encrypted DB + every module
+bun run check          # lint + typecheck + test + build + check:i18n + check:env-docs + check:api-docs
+bun run gen:env-docs   # regenerate docs/env-reference.md from the zod schema + .env.example
+bun run gen:api-docs   # regenerate docs/api-routes.md from the in-process Hono routes
+bun run compile        # Single-binary build (Bun executable)
+bun run clean          # Remove build artifacts
 ```
 
 ## Layout
 
 ```text
-apps/api/        Hono API with OpenAPI; Drizzle schema lives per-module
-apps/web/        React 19 SPA (TanStack Router file-based)
-packages/shared/ ECIES utilities used by both api and web
+apps/api/          Hono API; Drizzle schema lives per-module
+apps/web/          React 19 SPA (TanStack Router file-based)
+packages/shared/   ECIES utilities used by both api and web
 packages/tsconfig/ Shared TS config
-docs/            Architecture, module standards, deployment, rebranding
-tests/e2e/       Live e2e harness (dex + API)
-scripts/         compile / clean / check-i18n / dev-dex
+docs/              Architecture, module standards, deployment, rebranding
+tests/e2e/         Live e2e harness (dex + API)
+scripts/           dev-all / dev-dex / rebrand / module-new / compile / clean / check-i18n / gen-env-docs
 ```
 
 ## Documentation
@@ -73,4 +75,3 @@ scripts/         compile / clean / check-i18n / dev-dex
 - [`docs/rebranding.md`](docs/rebranding.md) — full rebranding checklist
 - [`docs/deployment.md`](docs/deployment.md) — production deployment + upgrade
 - [`docs/modules/`](docs/modules) — per-module deep dives
-- [`docs/changelog.md`](docs/changelog.md) — release notes

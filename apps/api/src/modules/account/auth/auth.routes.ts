@@ -1,8 +1,9 @@
 import type { Context } from "hono";
 import type { AppEnv } from "@/shared/lib/types";
 import { Buffer } from "node:buffer";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { clearSessionCookie, readSessionId, writeSessionCookie } from "@/modules/account/auth/session-cookie";
 import {
   consumeTotpChallenge,
   createTotpChallenge,
@@ -10,7 +11,7 @@ import {
   verifyTotpCode,
 } from "@/modules/account/users/totp.service";
 import { audit } from "@/modules/audit/audit.service";
-import { deriveOrigin, getAuthConfig, getOAuthConfig, getOidcLogoutUrl } from "@/shared/lib/app-config";
+import { deriveOrigin, getAuthConfig, getOAuthConfig, getOidcLogoutUrl, isOAuthConfigured } from "@/shared/lib/app-config";
 import { getClientIp } from "@/shared/lib/client-ip";
 import {
   consumePkceEntry,
@@ -46,7 +47,6 @@ function readIdTokenSub(idToken: string | undefined): string | null {
     return null;
   }
 }
-const SESSION_COOKIE = "session_id";
 const TOTP_PENDING_COOKIE = "totp_pending";
 // Browser-side `state` binding — closes the gap where PKCE alone proves
 // "the same browser holds the verifier" but does NOT prove "the same
@@ -117,6 +117,25 @@ function checkAuthRateLimit(ip: string): number {
 const RE_LEADING_SLASHES = /^[/\\]+/;
 const RE_BACKSLASH = /\\/g;
 
+/**
+ * Build a redirect to the SPA's shared `/error` page. Every auth failure
+ * path goes through here so the user always sees the same Card-based
+ * error layout. The frontend reads `?code` and `?detail` and renders an
+ * i18n message; the Retry button uses the browser's own history (no
+ * server-side "back" pointer needed). `detail` is truncated to defend
+ * against runaway IdP error_description payloads.
+ */
+type LoginErrorCode = "oauth_not_configured" | "oauth_state_invalid" | "oidc_error" | "user_disabled";
+
+function buildLoginErrorUrl(basePath: string, code: LoginErrorCode, detail?: string): string {
+  const url = new URL(`http://placeholder${basePath}/error`);
+  url.searchParams.set("code", code);
+  if (detail) {
+    url.searchParams.set("detail", detail.slice(0, 200));
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 function sanitizeRedirect(raw: string, basePath: string): string {
   // Reject:
   //  - empty / non-`/` strings (relative paths could resolve to current host
@@ -150,7 +169,7 @@ function sanitizeRedirect(raw: string, basePath: string): string {
 }
 
 export function authRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   // GET /account/auth/login — initiate OAuth flow (with optional PKCE)
   router.get("/account/auth/login", async (c) => {
@@ -162,8 +181,16 @@ export function authRoutes() {
       }
     }
     const config = c.get("config");
-    const oauth = getOAuthConfig(config);
     const base = config.BASE_PATH;
+    // OAuth is a hard requirement: refuse to start the dance when any of
+    // OAUTH_CLIENT_ID / OAUTH_*_URL is missing, instead of letting
+    // getOAuthConfig throw into Hono's default 500 handler. Bouncing back
+    // to /login with a banner-friendly error code keeps the user in the
+    // SPA flow.
+    if (!isOAuthConfigured(config)) {
+      return c.redirect(buildLoginErrorUrl(base, "oauth_not_configured"), 302);
+    }
+    const oauth = getOAuthConfig(config);
     const callbackUrl = `${deriveOrigin(c.req.raw, config)}${base}/api/account/auth/callback`;
     const redirectUri = sanitizeRedirect(c.req.query("redirect") ?? `${base}/portal`, base);
 
@@ -202,6 +229,13 @@ export function authRoutes() {
     const db = c.get("db");
     const config = c.get("config");
     const logger = c.get("logger");
+    const base = config.BASE_PATH;
+    // Same guard as /login: if the OAuth config was wiped between the user
+    // bouncing out to the IdP and bouncing back, surface a real error
+    // instead of letting getOAuthConfig throw into a 500.
+    if (!isOAuthConfigured(config)) {
+      return c.redirect(buildLoginErrorUrl(base, "oauth_not_configured"), 302);
+    }
     const oauth = getOAuthConfig(config);
     const authCfg = await getAuthConfig(db, config);
 
@@ -225,11 +259,11 @@ export function authRoutes() {
         userAgent: c.req.header("user-agent") ?? "unknown",
         result: "failure",
       });
-      return c.json({ success: false, error: { code: "OAUTH_ERROR", message: desc } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oidc_error", desc), 302);
     }
 
     if (!code || !state) {
-      return c.json({ success: false, error: { code: "INVALID_CALLBACK", message: "Missing code or state" } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oauth_state_invalid"), 302);
     }
 
     // `state` must match the cookie planted at /login. A reload after the
@@ -239,15 +273,14 @@ export function authRoutes() {
     const cookieState = getCookie(c, cookieName);
     deleteCookie(c, cookieName, { path: "/" });
     if (!cookieState || cookieState !== state) {
-      return c.json({ success: false, error: { code: "INVALID_STATE", message: "State cookie missing or does not match" } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oauth_state_invalid"), 302);
     }
 
     const pkceEntry = await consumePkceEntry(state);
     if (!pkceEntry) {
-      return c.json({ success: false, error: { code: "INVALID_STATE", message: "Invalid or expired state" } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oauth_state_invalid"), 302);
     }
 
-    const base = config.BASE_PATH;
     const origin = deriveOrigin(c.req.raw, config);
     const callbackUrl = new URL(`${origin}${base}/api/account/auth/callback`);
     // Mirror the inbound query string so openid-client can validate the
@@ -269,7 +302,7 @@ export function authRoutes() {
         err: err instanceof Error ? err.message : String(err),
         code: (err as { code?: unknown }).code,
       }, "OAuth token exchange failed");
-      return c.json({ success: false, error: { code: "OAUTH_ERROR", message: "Token exchange failed" } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oidc_error", "Token exchange failed"), 302);
     }
     let userInfo;
     try {
@@ -287,13 +320,13 @@ export function authRoutes() {
     }
     catch (err) {
       logger.error({ err: err instanceof Error ? err.message : String(err) }, "OAuth userinfo fetch failed");
-      return c.json({ success: false, error: { code: "OAUTH_ERROR", message: "Userinfo fetch failed" } }, 400);
+      return c.redirect(buildLoginErrorUrl(base, "oidc_error", "Userinfo fetch failed"), 302);
     }
     const user = await upsertUser(db, userInfo, authCfg, logger);
 
     if (user.status === "disabled") {
       logger.warn({ username: user.username }, "login denied: user is disabled");
-      return c.json({ success: false, error: { code: "USER_DISABLED", message: "Account is disabled" } }, 403);
+      return c.redirect(buildLoginErrorUrl(base, "user_disabled"), 302);
     }
 
     // Check if user has TOTP enabled — if so, defer session creation
@@ -325,13 +358,7 @@ export function authRoutes() {
       tokens.expires_in,
     );
 
-    setCookie(c, SESSION_COOKIE, sessionId, {
-      httpOnly: true,
-      secure: config.NODE_ENV === "production",
-      sameSite: "Lax",
-      path: "/",
-      maxAge: authCfg.sessionMaxAge,
-    });
+    writeSessionCookie(c, config.NODE_ENV, sessionId, authCfg.sessionMaxAge);
 
     await audit(db, {
       actorId: user.id,
@@ -352,7 +379,7 @@ export function authRoutes() {
   router.post("/account/auth/logout", async (c) => {
     const db = c.get("db");
     const config = c.get("config");
-    const sessionId = getCookie(c, SESSION_COOKIE);
+    const sessionId = readSessionId(c);
 
     let logoutUser: { id: string; name: string; username: string } | undefined;
     if (sessionId) {
@@ -374,7 +401,7 @@ export function authRoutes() {
       await deleteSession(db, sessionId);
     }
 
-    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    clearSessionCookie(c, config.NODE_ENV);
 
     if (logoutUser) {
       await audit(db, {
@@ -486,13 +513,7 @@ export function authRoutes() {
       challenge.expiresIn ?? undefined,
     );
 
-    setCookie(c, SESSION_COOKIE, sessionId, {
-      httpOnly: true,
-      secure: config.NODE_ENV === "production",
-      sameSite: "Lax",
-      path: "/",
-      maxAge: authCfg.sessionMaxAge,
-    });
+    writeSessionCookie(c, config.NODE_ENV, sessionId, authCfg.sessionMaxAge);
 
     // Resolve the human name for the audit row — challenge.userId is just
     // the opaque id, which makes the audit log unreadable in the UI.

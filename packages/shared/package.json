@@ -1,7 +1,7 @@
 {
   "name": "@app/shared",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "ECIES utilities shared between api and web.",
   "homepage": "https://github.com/zzci",
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@noble/secp256k1": "^3.0.0"
+    "@noble/secp256k1": "3.1.0"
   },
   "devDependencies": {
     "@app/tsconfig": "workspace:*",

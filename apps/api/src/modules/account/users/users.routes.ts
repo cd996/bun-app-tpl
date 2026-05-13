@@ -1,6 +1,6 @@
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq } from "drizzle-orm";
+import { Hono } from "hono";
 import { z } from "zod";
 import { sessions } from "@/modules/account/auth/schema";
 import { userPreferences, users } from "@/modules/account/users/schema";
@@ -38,7 +38,7 @@ const updateBodySchema = z.object({
 });
 
 export function userRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   router.use("*", authRequired);
 
@@ -241,13 +241,18 @@ export function userRoutes() {
     return c.json({ success: true, data: { token } });
   });
 
-  // ── /users — admin endpoints ──
-
-  router.get("/account/users/active", async (c) => {
+  // GET /account/visible-users — directory of active users exposed to every
+  // authenticated caller. Intentionally NOT admin-gated: the document /
+  // issue sharing and assignment pickers need it on the user-facing UI.
+  // Lives outside the `/account/users/*` namespace (which is admin-only)
+  // so the public-vs-admin boundary is legible from the URL alone.
+  router.get("/account/visible-users", async (c) => {
     const db = c.get("db");
     const data = await listActiveUsers(db);
     return c.json({ success: true, data, meta: { total: data.length } });
   });
+
+  // ── /account/users — admin endpoints ──
 
   // GET /users — list with pagination, search, filter
   router.get("/account/users", adminRequired, async (c) => {

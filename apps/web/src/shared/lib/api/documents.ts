@@ -20,6 +20,11 @@ export interface Document {
   readonly tags: string;
   readonly parentId: string | null;
   readonly version: number;
+  /**
+   * When true, new comments are rejected by the API (admin/creator
+   * bypass). Existing comments stay visible.
+   */
+  readonly commentsLocked: boolean;
   readonly creatorId: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -68,15 +73,6 @@ export interface Attachment {
   readonly createdAt: string;
 }
 
-export interface DocumentComment {
-  readonly id: string;
-  readonly documentId: string;
-  readonly authorId: string;
-  readonly content: string;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
 // ── Helpers ──
 
 export function parseTags(tagsJson: string | null | undefined): string[] {
@@ -89,30 +85,6 @@ export function parseTags(tagsJson: string | null | undefined): string[] {
   catch {
     return [];
   }
-}
-
-/**
- * Walks `parentId` to produce the ancestor chain (root → … → leaf), inclusive
- * of the leaf itself. Cycle-safe via a seen-set so a malformed tree never
- * locks the breadcrumb.
- */
-export function buildAncestorChain(
-  tree: readonly DocumentTreeNode[],
-  leafId: string,
-): readonly DocumentTreeNode[] {
-  const byId = new Map(tree.map(n => [n.id, n]));
-  const chain: DocumentTreeNode[] = [];
-  const seen = new Set<string>();
-  let cursor: string | null = leafId;
-  while (cursor && !seen.has(cursor)) {
-    seen.add(cursor);
-    const node = byId.get(cursor);
-    if (!node)
-      break;
-    chain.unshift(node);
-    cursor = node.parentId;
-  }
-  return chain;
 }
 
 // ── Raw clients ──
@@ -166,6 +138,7 @@ interface UpdatePayload {
   readonly content?: string;
   readonly tags?: readonly string[];
   readonly parentId?: string | null;
+  readonly commentsLocked?: boolean;
   readonly version: number;
 }
 
@@ -278,6 +251,7 @@ export interface UpdateDocumentInput {
   readonly content?: string;
   readonly tags?: readonly string[];
   readonly parentId?: string | null;
+  readonly commentsLocked?: boolean;
 }
 
 /**
@@ -301,6 +275,7 @@ export function useUpdateDocument(): UseMutationResult<Document, Error, UpdateDo
           ...(input.content !== undefined ? { content: input.content } : {}),
           ...(input.tags !== undefined ? { tags: JSON.stringify(input.tags) } : {}),
           ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
+          ...(input.commentsLocked !== undefined ? { commentsLocked: input.commentsLocked } : {}),
         });
       }
       return { previous };

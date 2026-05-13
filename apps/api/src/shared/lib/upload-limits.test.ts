@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { customAlphabet } from "nanoid";
 import { createDb } from "@/db";
 import { users } from "@/modules/account/users/schema";
-import { documentAttachments, documents } from "@/modules/document/schema";
+import { files } from "@/modules/file/schema";
 import { AppError } from "@/shared/lib/errors";
 import { assertWithinTotalQuota, getUploadsUsedBytes, isWithinFileSize, MAX_UPLOAD_BYTES } from "./upload-limits";
 
@@ -25,11 +25,9 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-async function seedDocAttachment(size: number) {
+async function seedFileRow(size: number) {
   const userId = nanoid();
-  const docId = nanoid();
   const now = new Date().toISOString();
-
   await db.insert(users).values({
     id: userId,
     oauthSub: `sub_${userId}`,
@@ -39,24 +37,18 @@ async function seedDocAttachment(size: number) {
     createdAt: now,
     updatedAt: now,
   }).run();
-
-  await db.insert(documents).values({
-    id: docId,
-    title: "t",
-    creatorId: userId,
-    createdAt: now,
-    updatedAt: now,
-  }).run();
-
-  await db.insert(documentAttachments).values({
-    id: nanoid(),
-    documentId: docId,
-    filename: "x.txt",
-    filepath: `/tmp/${nanoid()}`,
-    mimetype: "text/plain",
+  // 64-hex content key; unique per row so the (sha256, storage_driver)
+  // UNIQUE index doesn't reject.
+  const sha = (`a${userId}${userId}${userId}`).repeat(8).slice(0, 64);
+  await db.insert(files).values({
+    id: `01k${nanoid()}${nanoid()}${nanoid()}`.slice(0, 26),
+    sha256: sha,
     size,
+    mimetype: "text/plain",
+    storageDriver: "local",
+    storageKey: `aa/bb/${sha}`,
+    refCount: 1,
     uploadedBy: userId,
-    createdAt: now,
   }).run();
 }
 
@@ -80,9 +72,9 @@ describe("getUploadsUsedBytes", () => {
     expect(await getUploadsUsedBytes(db)).toBe(0);
   });
 
-  test("sums attachment sizes across modules", async () => {
-    await seedDocAttachment(1024);
-    await seedDocAttachment(2048);
+  test("sums file sizes", async () => {
+    await seedFileRow(1024);
+    await seedFileRow(2048);
     expect(await getUploadsUsedBytes(db)).toBe(3072);
   });
 });
@@ -103,13 +95,13 @@ describe("assertWithinTotalQuota", () => {
   });
 
   test("passes when used + additional is exactly at the limit", async () => {
-    await seedDocAttachment(900);
+    await seedFileRow(900);
     process.env.UPLOADS_TOTAL_BYTES = "1000";
     await expect(assertWithinTotalQuota(db, 100)).resolves.toBeUndefined();
   });
 
   test("throws 413 QUOTA_EXCEEDED when usage + additional would exceed the limit", async () => {
-    await seedDocAttachment(900);
+    await seedFileRow(900);
     process.env.UPLOADS_TOTAL_BYTES = "1000";
     try {
       await assertWithinTotalQuota(db, 200);

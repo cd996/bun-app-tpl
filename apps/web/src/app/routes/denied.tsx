@@ -65,7 +65,7 @@ function DeniedPage() {
   const showSignOut = reason === "user_disabled";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
       <div className="absolute right-4 top-4">
         <ModeToggle />
       </div>

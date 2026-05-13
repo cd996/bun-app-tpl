@@ -1,5 +1,5 @@
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { z } from "zod";
 import { audit } from "@/modules/audit/audit.service";
 import { isEncryptionDisabled } from "@/modules/encryption/state";
@@ -13,14 +13,14 @@ import { getDataModules, getModuleNames } from "./registry";
 const RE_TIMESTAMP_CHARS = /[:.]/g;
 
 export function backupExportRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
+  const router = new Hono<AppEnv>();
 
   // Service-token export — for automated sidecar / cron jobs. Skips the
   // session-cookie + DEK-challenge dance (the sidecar has no master
   // password) and instead trusts a long-lived bearer issued out-of-band.
   // The route is intentionally minimal: the caller picks all modules and
   // the API streams everything currently in the running, unlocked DB.
-  router.post("/backup/export-via-token", serviceTokenRequired, async (c) => {
+  router.post("/backup/export-via-token", serviceTokenRequired("backup"), async (c) => {
     const db = c.get("db");
     const { modules, body } = streamJsonBackup(db, [...getModuleNames()]);
     const timestamp = new Date().toISOString().replace(RE_TIMESTAMP_CHARS, "-").slice(0, 19);

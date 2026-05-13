@@ -106,15 +106,6 @@ export function endOperation(): void {
   state.operationInProgress = false;
 }
 
-/**
- * @deprecated The DEK is no longer cached in memory. Admin operations that
- * need the DEK receive it via challenge-response. Use `isUnlocked()` to check
- * lock state. Calling this function is a programming error.
- */
-export function getDek(): never {
-  throw new Error("getDek() is no longer supported; the DEK is not retained in memory.");
-}
-
 export function isUnlocked(): boolean {
   return state.unlocked;
 }

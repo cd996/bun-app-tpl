@@ -6,11 +6,14 @@ Code layout:
 
 ```text
 apps/api/src/modules/policy/
-  namespace-config.ts
-  policy.routes.ts
-  policy.service.ts
+  schema.ts                # `relation_tuples` + resource-group rows
+  namespace-config.ts      # `item` / `group` namespace declarations + rewrite rules
+  zanzibar.engine.ts       # check / expand / listUserResources implementations
+  policy.service.ts        # tuple CRUD + batch ops
   resource-group.service.ts
-  zanzibar.engine.ts
+  policy.routes.ts
+  policy.backup.ts         # backup contribution
+  index.ts                 # registers backup contribution
 ```
 
 ## Tuple Model

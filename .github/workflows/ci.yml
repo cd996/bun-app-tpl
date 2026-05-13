@@ -64,7 +64,7 @@ jobs:
           load: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: access:ci-${{ github.sha }}
+          tags: app:ci-${{ github.sha }}
 
   e2e:
     name: e2e (dex + api)

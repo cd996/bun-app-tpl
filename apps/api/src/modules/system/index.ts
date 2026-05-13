@@ -1,1 +1,1 @@
-export { openapiRoutes, systemRoutes } from "./system.routes";
+export { systemRoutes } from "./system.routes";

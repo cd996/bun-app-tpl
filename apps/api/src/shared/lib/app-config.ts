@@ -33,6 +33,20 @@ export interface AuthConfig {
   readonly defaultAdmins: readonly string[];
 }
 
+/**
+ * Non-throwing predicate so callers can decide between "redirect with a
+ * user-facing banner" and "let the exception bubble into a 500". Mirrors
+ * the validation in `getOAuthConfig` — keep them in sync.
+ */
+export function isOAuthConfigured(config: Config): boolean {
+  return Boolean(
+    config.OAUTH_CLIENT_ID
+    && config.OAUTH_AUTHORIZE_URL
+    && config.OAUTH_TOKEN_URL
+    && config.OAUTH_USERINFO_URL,
+  );
+}
+
 export function getOAuthConfig(config: Config): OAuthConfig {
   const clientId = config.OAUTH_CLIENT_ID;
   if (!clientId)

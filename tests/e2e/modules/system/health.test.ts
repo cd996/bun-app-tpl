@@ -31,9 +31,4 @@ describe("/api/health (live, encrypted, unlocked)", () => {
     expect(res.data.status).toBe("unlocked");
   });
 
-  it("/api/openapi.json requires admin (not reachable anonymously)", async () => {
-    const c = new ApiClient();
-    const res = await c.raw("/api/openapi.json");
-    expect(res.status).toBe(401);
-  });
 });

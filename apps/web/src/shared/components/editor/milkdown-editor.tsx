@@ -11,9 +11,12 @@
 // commonmark / gfm presets via ProseMirror input rules.
 
 import type { Ctx } from "@milkdown/kit/ctx";
+import type { Node as ProseNode } from "@milkdown/kit/prose/model";
+import type { EditorView, NodeView } from "@milkdown/kit/prose/view";
 import type { JSX } from "react";
 
-import { defaultValueCtx, Editor, editorViewCtx, rootCtx } from "@milkdown/kit/core";
+import { defaultValueCtx, Editor, editorViewCtx, editorViewOptionsCtx, rootCtx } from "@milkdown/kit/core";
+import { clipboard } from "@milkdown/kit/plugin/clipboard";
 import { history, redoCommand, undoCommand } from "@milkdown/kit/plugin/history";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
 import {
@@ -29,7 +32,14 @@ import {
   wrapInHeadingCommand,
   wrapInOrderedListCommand,
 } from "@milkdown/kit/preset/commonmark";
-import { gfm, insertTableCommand, toggleStrikethroughCommand } from "@milkdown/kit/preset/gfm";
+import {
+  addColAfterCommand,
+  addRowAfterCommand,
+  deleteSelectedCellsCommand,
+  gfm,
+  insertTableCommand,
+  toggleStrikethroughCommand,
+} from "@milkdown/kit/preset/gfm";
 import { lift } from "@milkdown/kit/prose/commands";
 import { callCommand, replaceAll } from "@milkdown/kit/utils";
 import { Milkdown, MilkdownProvider, useEditor, useInstance } from "@milkdown/react";
@@ -38,6 +48,7 @@ import {
   CheckSquare,
   Code,
   Code2,
+  Columns3,
   Heading1,
   Heading2,
   Heading3,
@@ -48,8 +59,10 @@ import {
   Minus,
   Quote,
   Redo2,
+  Rows3,
   Strikethrough,
   Table as TableIcon,
+  Trash2,
   Undo2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -68,6 +81,11 @@ interface MilkdownMarkdownEditorProps {
   readonly className?: string | undefined;
   readonly placeholder?: string | undefined;
   readonly minHeight?: number | undefined;
+  // Render the toolbar as a centered floating tile (rounded card with
+  // its own border) instead of the default full-width bar. Used by the
+  // immersive doc-detail editor so the toolbar reads as a writing aid,
+  // not a page-spanning header.
+  readonly floatingToolbar?: boolean | undefined;
 }
 
 function ToolbarButton({
@@ -154,7 +172,89 @@ function toggleTaskList(ctx: Ctx) {
   flipAtDepth();
 }
 
-function Toolbar({ compact }: { readonly compact?: boolean | undefined }) {
+// Node view for `list_item`. GFM's task-list extension only adds a
+// `checked` attr (null = plain list item, true/false = task) and renders
+// `<li data-checked="...">`. Without a node view there is no real
+// `<input>`, so the checkbox is non-interactive. This view paints a real
+// checkbox when `checked != null`, stops mousedown from blurring the
+// editor selection, and dispatches a setNodeMarkup on change.
+function createTaskListItemNodeView(
+  node: ProseNode,
+  view: EditorView,
+  getPos: () => number | undefined,
+): NodeView {
+  const dom = document.createElement("li");
+  const contentDOM = document.createElement("div");
+  contentDOM.className = "md-li-content";
+  let checkbox: HTMLInputElement | null = null;
+
+  const render = (n: ProseNode) => {
+    dom.removeAttribute("data-item-type");
+    dom.removeAttribute("data-checked");
+    if (checkbox) {
+      checkbox.remove();
+      checkbox = null;
+    }
+    if (n.attrs.checked != null) {
+      dom.setAttribute("data-item-type", "task");
+      dom.setAttribute("data-checked", String(n.attrs.checked));
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!n.attrs.checked;
+      cb.contentEditable = "false";
+      cb.className = "md-task-checkbox";
+      // Preserve the editor's selection — without this, clicking the
+      // checkbox blurs the doc and steals focus, which feels wrong.
+      cb.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+      });
+      cb.addEventListener("change", (e) => {
+        const pos = getPos();
+        if (pos == null)
+          return;
+        const current = view.state.doc.nodeAt(pos);
+        if (!current)
+          return;
+        view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, {
+          ...current.attrs,
+          checked: (e.target as HTMLInputElement).checked,
+        }));
+      });
+      dom.prepend(cb);
+      checkbox = cb;
+    }
+  };
+
+  render(node);
+  dom.appendChild(contentDOM);
+
+  return {
+    dom,
+    contentDOM,
+    update(updated) {
+      if (updated.type !== node.type)
+        return false;
+      render(updated);
+      return true;
+    },
+    // The checkbox lives in `dom` but outside `contentDOM`; without this
+    // ProseMirror would treat its attribute flips as foreign mutations
+    // and try to re-render the node from scratch.
+    ignoreMutation(mutation) {
+      if (!(mutation.target instanceof Node))
+        return false;
+      return checkbox != null && checkbox.contains(mutation.target);
+    },
+  };
+}
+
+function Toolbar({
+  compact,
+  floating,
+}: {
+  readonly compact?: boolean | undefined;
+  readonly floating?: boolean | undefined;
+}) {
   const { t } = useTranslation();
   const [loading, getInstance] = useInstance();
 
@@ -187,7 +287,12 @@ function Toolbar({ compact }: { readonly compact?: boolean | undefined }) {
     <div
       role="toolbar"
       aria-label={t("editor.toolbar", "Editor toolbar")}
-      className="flex flex-wrap items-center gap-0.5 border-b bg-muted/30 px-2 py-1"
+      className={cn(
+        "flex flex-wrap items-center gap-0.5 bg-muted/30 px-2 py-1",
+        floating
+          ? "my-2 max-w-full self-center rounded-md border"
+          : "border-b",
+      )}
     >
       <ToolbarButton
         icon={<Undo2 className={iconCls} />}
@@ -273,6 +378,21 @@ function Toolbar({ compact }: { readonly compact?: boolean | undefined }) {
             onClick={() => run(callCommand(insertTableCommand.key))}
           />
           <ToolbarButton
+            icon={<Rows3 className={iconCls} />}
+            title={t("editor.tableAddRow", "Add row")}
+            onClick={() => run(callCommand(addRowAfterCommand.key))}
+          />
+          <ToolbarButton
+            icon={<Columns3 className={iconCls} />}
+            title={t("editor.tableAddColumn", "Add column")}
+            onClick={() => run(callCommand(addColAfterCommand.key))}
+          />
+          <ToolbarButton
+            icon={<Trash2 className={iconCls} />}
+            title={t("editor.tableDelete", "Delete row/column")}
+            onClick={() => run(callCommand(deleteSelectedCellsCommand.key))}
+          />
+          <ToolbarButton
             icon={<Minus className={iconCls} />}
             title={t("editor.horizontalRule")}
             onClick={() => run(callCommand(insertHrCommand.key))}
@@ -350,6 +470,7 @@ function EditorBody({
   compact = false,
   placeholder,
   minHeight,
+  floatingToolbar = false,
 }: EditorBodyProps) {
   const { t } = useTranslation();
   const [isEmpty, setIsEmpty] = useState(initialValue.trim() === "");
@@ -370,18 +491,35 @@ function EditorBody({
           lastEmittedRef.current = md;
           onChangeRef.current?.(md);
         });
+        // Register an interactive node view for `list_item` so GFM task
+        // list checkboxes (`- [ ]` / `- [x]`) are clickable. The default
+        // gfm preset extends the schema with a `checked` attr but only
+        // renders `<li data-checked="...">` — no real <input>, so users
+        // can't toggle. The node view here paints a real checkbox and
+        // dispatches a setNodeMarkup transaction on change.
+        ctx.update(editorViewOptionsCtx, prev => ({
+          ...prev,
+          nodeViews: {
+            ...(prev?.nodeViews ?? {}),
+            list_item: createTaskListItemNodeView,
+          },
+        }));
       })
       .use(commonmark)
       .use(gfm)
       .use(history)
-      .use(listener));
+      .use(listener)
+      // Parses pasted text/HTML through Milkdown's serializer + parser
+      // so pasted markdown (e.g. `# Title`, `- list`, `**bold**`) is
+      // converted to rich nodes instead of staying as plain text.
+      .use(clipboard));
 
   const effectiveMinHeight = minHeight ?? (compact ? 80 : 280);
   const placeholderText = placeholder ?? t("editor.placeholder", "Start writing… Markdown shortcuts work as you type.");
 
   return (
     <>
-      <Toolbar compact={compact} />
+      <Toolbar compact={compact} floating={floatingToolbar} />
       <div className="md-editor-shell" style={{ minHeight: effectiveMinHeight }}>
         <Milkdown />
         {isEmpty && <div className="md-editor-placeholder">{placeholderText}</div>}

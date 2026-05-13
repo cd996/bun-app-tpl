@@ -20,7 +20,7 @@ interface PortalTile {
 }
 
 const PORTAL_TILES: readonly PortalTile[] = [
-  { key: "myTodos", path: "/portal/todos", icon: CheckSquare },
+  { key: "myIssues", path: "/portal/issues", icon: CheckSquare },
   { key: "documents", path: "/portal/documents", icon: FileText },
 ];
 

@@ -40,10 +40,10 @@ describe("registerBackupContribution + getDataModules", () => {
 
 describe("getModuleNames", () => {
   test("returns sorted names regardless of registration order", () => {
-    registerBackupContribution({ name: "todos", tables: [fakeTable("todos")], deps: ["users"] });
+    registerBackupContribution({ name: "issues", tables: [fakeTable("issues")], deps: ["users"] });
     registerBackupContribution({ name: "users", tables: [fakeTable("users")], deps: [] });
     registerBackupContribution({ name: "policies", tables: [fakeTable("rt")], deps: ["users"] });
-    expect(getModuleNames()).toEqual(["policies", "todos", "users"]);
+    expect(getModuleNames()).toEqual(["issues", "policies", "users"]);
   });
 });
 
@@ -59,10 +59,10 @@ describe("resolveModulesWithDeps", () => {
   test("dedupes when a dep is named twice", () => {
     registerBackupContribution({ name: "users", tables: [fakeTable("users")], deps: [] });
     registerBackupContribution({ name: "documents", tables: [fakeTable("documents")], deps: ["users"] });
-    registerBackupContribution({ name: "todos", tables: [fakeTable("todos")], deps: ["users"] });
+    registerBackupContribution({ name: "issues", tables: [fakeTable("issues")], deps: ["users"] });
 
-    const r = resolveModulesWithDeps(["documents", "todos"]);
-    expect(r).toEqual(["users", "documents", "todos"]);
+    const r = resolveModulesWithDeps(["documents", "issues"]);
+    expect(r).toEqual(["users", "documents", "issues"]);
   });
 
   test("ignores unknown module names rather than throwing", () => {

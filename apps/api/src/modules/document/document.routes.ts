@@ -1,31 +1,26 @@
 import type { Context } from "hono";
 import type { AppEnv } from "@/shared/lib/types";
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { Hono } from "hono";
 import { z } from "zod";
 import { audit } from "@/modules/audit/audit.service";
+import {
+  buildDownloadResponse,
+  getFileById,
+  getReferenceById,
+  listAttachmentsByOwner,
+  makeAttachmentView,
+  releaseAllByOwner,
+  releaseReference,
+  uploadAndReference,
+} from "@/modules/file";
+import { mountItemCommentRoutes } from "@/modules/item/comment.routes";
 import { getClientIp } from "@/shared/lib/client-ip";
 import { AppError, ForbiddenError, NotFoundError } from "@/shared/lib/errors";
 import { MAX_UPLOAD_BYTES } from "@/shared/lib/upload-limits";
 import { authRequired } from "@/shared/middleware/auth";
 import {
-  canAddAttachment,
-  deleteAttachment,
-  getAttachmentById,
-  listAttachments,
-  saveAttachment,
-  validateAttachmentMimetype,
-  validateAttachmentSize,
-} from "./attachment.service";
-import {
-  createComment,
-  deleteComment,
-  getCommentById,
-  listComments,
-} from "./comment.service";
-import {
   addDocumentShare,
   createDocument,
-  deleteDocument,
   getDocumentById,
   getDocumentPermission,
   getDocumentShareById,
@@ -38,8 +33,9 @@ import {
   listDocuments,
   listDocumentSharesWithInheritance,
   listMyDocuments,
-  moveDocument,
   removeDocumentShare,
+  resolveDocumentItem,
+  softDeleteDocument,
   updateDocument,
 } from "./document.service";
 
@@ -57,8 +53,7 @@ const updateSchema = z.object({
   content: z.string().max(50000).optional(),
   tags: z.array(tagSchema).max(20).optional(),
   parentId: z.string().nullable().optional(),
-  // Required for optimistic concurrency. Clients send the version they last
-  // observed; a mismatch returns 409 so auto-save doesn't silently clobber.
+  commentsLocked: z.boolean().optional(),
   version: z.number().int().nonnegative(),
 }).refine(d => Object.entries(d).some(([k, v]) => k !== "version" && v !== undefined), {
   message: "At least one mutable field must be provided",
@@ -100,7 +95,7 @@ function assertOwnerOrAdmin(user: { id: string; role: string }, doc: { creatorId
 }
 
 async function assertMoveTargetAllowed(
-  db: Parameters<typeof getDocumentById>[0],
+  db: Parameters<typeof getDocumentPermission>[0],
   user: { id: string; role: string },
   movingId: string,
   targetParentId: string | null,
@@ -122,11 +117,9 @@ async function assertMoveTargetAllowed(
 }
 
 export function documentRoutes() {
-  const router = new OpenAPIHono<AppEnv>();
-
+  const router = new Hono<AppEnv>();
   router.use("*", authRequired);
 
-  // GET /documents — list (admin: all, user: own + published)
   router.get("/documents", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -148,8 +141,6 @@ export function documentRoutes() {
     });
   });
 
-  // GET /documents/tree — every doc the caller can read, flat-with-parentId.
-  // The frontend assembles the tree; payload stays light (no content/tags).
   router.get("/documents/tree", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -157,35 +148,29 @@ export function documentRoutes() {
     return c.json({ success: true, data });
   });
 
-  // GET /documents/tags — list all unique tags
   router.get("/documents/tags", async (c) => {
     const db = c.get("db");
     const tags = await listAllTags(db);
     return c.json({ success: true, data: tags });
   });
 
-  // GET /documents/users — list active users (for sharing UI)
   router.get("/documents/users", async (c) => {
     const db = c.get("db");
     const data = await listActiveUsers(db);
     return c.json({ success: true, data });
   });
 
-  // GET /documents/groups — list all groups (for sharing UI)
   router.get("/documents/groups", async (c) => {
     const db = c.get("db");
     const data = await listAllGroups(db);
     return c.json({ success: true, data });
   });
 
-  // POST /documents — create
   router.post("/documents", async (c) => {
     const db = c.get("db");
     const body = createSchema.parse(await c.req.json());
     const actor = c.get("user")!;
-
     const doc = await createDocument(db, { ...body, creatorId: actor.id });
-
     await audit(db, {
       actorId: actor.id,
       actorName: actor.name,
@@ -196,25 +181,20 @@ export function documentRoutes() {
       ...auditMeta(c),
       result: "success",
     });
-
     return c.json({ success: true, data: doc }, 201);
   });
 
-  // GET /documents/:id — detail
   router.get("/documents/:id", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
-    const doc = await getDocumentById(db, c.req.param("id"));
+    const id = c.req.param("id");
+    const doc = await getDocumentById(db, id);
     if (!doc)
-      throw new NotFoundError("Document", c.req.param("id"));
+      throw new NotFoundError("Document", id);
     await assertAccess(db, user, doc, "viewer");
     return c.json({ success: true, data: doc });
   });
 
-  // PATCH /documents/:id — update (creator or admin/editor). `version` is
-  // required (optimistic concurrency); mismatch returns 409 with the current
-  // row so the caller can reconcile. If `parentId` is being moved, the target
-  // is validated the same way as PATCH /documents/:id/move.
   router.patch("/documents/:id", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -230,8 +210,17 @@ export function documentRoutes() {
       await assertMoveTargetAllowed(db, user, id, body.parentId);
     }
 
+    if (body.commentsLocked !== undefined && body.commentsLocked !== existing.commentsLocked) {
+      const isOwner = existing.creatorId === user.id;
+      const isAdmin = user.role === "admin";
+      if (!isOwner && !isAdmin)
+        throw new ForbiddenError("Only the document creator or an admin can change the comment lock state");
+    }
+
     const { version: expectedVersion, ...rest } = body;
     const updated = await updateDocument(db, id, { ...rest, expectedVersion });
+    if (!updated)
+      throw new NotFoundError("Document", id);
     if (isVersionConflict(updated)) {
       return c.json(
         { success: false, error: { code: "VERSION_CONFLICT", message: "Document was modified by another writer" }, data: updated.current },
@@ -253,8 +242,6 @@ export function documentRoutes() {
     return c.json({ success: true, data: updated });
   });
 
-  // PATCH /documents/:id/move — re-parent a document. Validates target exists,
-  // caller can edit it, and the move would not introduce a cycle.
   router.patch("/documents/:id/move", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -267,7 +254,9 @@ export function documentRoutes() {
     const body = moveSchema.parse(await c.req.json());
     await assertMoveTargetAllowed(db, user, id, body.parentId);
 
-    const moved = await moveDocument(db, id, body.parentId);
+    const moved = await updateDocument(db, id, { parentId: body.parentId });
+    if (!moved || isVersionConflict(moved))
+      throw new NotFoundError("Document", id);
 
     await audit(db, {
       actorId: user.id,
@@ -284,7 +273,6 @@ export function documentRoutes() {
     return c.json({ success: true, data: moved });
   });
 
-  // DELETE /documents/:id — delete (creator or admin)
   router.delete("/documents/:id", async (c) => {
     const db = c.get("db");
     const user = c.get("user")!;
@@ -292,19 +280,26 @@ export function documentRoutes() {
     const existing = await getDocumentById(db, id);
     if (!existing)
       throw new NotFoundError("Document", id);
-
     if (user.role !== "admin" && existing.creatorId !== user.id) {
       throw new ForbiddenError();
     }
 
-    // Capture descendants before the cascade so we can emit one audit event
-    // per dropped document — the FK cascade deletes them silently otherwise.
     const descendantIds = await listDescendantIds(db, id);
-    const descendants = descendantIds.length > 0
-      ? await Promise.all(descendantIds.map(d => getDocumentById(db, d)))
-      : [];
+    const descendantRows = await Promise.all(descendantIds.map(d => getDocumentById(db, d)));
 
-    await deleteDocument(db, id);
+    // Release every attachment in the subtree before stamping deleted_at —
+    // refcounts drain so the async GC reclaims any blobs that were only
+    // referenced by the deleted documents.
+    const item = await resolveDocumentItem(db, id);
+    if (item)
+      await releaseAllByOwner(db, "item_attachment", item.id);
+    for (const dId of descendantIds) {
+      const dItem = await resolveDocumentItem(db, dId);
+      if (dItem)
+        await releaseAllByOwner(db, "item_attachment", dItem.id);
+    }
+
+    await softDeleteDocument(db, id);
 
     const meta = auditMeta(c);
     await audit(db, {
@@ -317,7 +312,7 @@ export function documentRoutes() {
       ...meta,
       result: "success",
     });
-    for (const d of descendants) {
+    for (const d of descendantRows) {
       if (!d)
         continue;
       await audit(db, {
@@ -345,12 +340,10 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     await assertAccess(db, user, doc, "editor");
+    const item = await resolveDocumentItem(db, id);
+    if (!item)
+      throw new NotFoundError("Document", id);
 
-    if (!(await canAddAttachment(db, id))) {
-      throw new AppError("Maximum attachments per document reached (20)", 400, "LIMIT_EXCEEDED");
-    }
-
-    // Reject oversize uploads before buffering the body.
     const contentLength = Number(c.req.header("content-length") ?? "0");
     if (contentLength > MAX_UPLOAD_BYTES) {
       throw new AppError("Upload too large", 413, "UPLOAD_TOO_LARGE");
@@ -361,13 +354,13 @@ export function documentRoutes() {
     if (!(file instanceof File)) {
       throw new AppError("No file provided", 400, "VALIDATION_ERROR");
     }
-    if (!validateAttachmentSize(file.size)) {
-      throw new AppError("File size exceeds 10MB limit", 400, "FILE_TOO_LARGE");
-    }
-    if (!validateAttachmentMimetype(file.type)) {
-      throw new AppError("File type not allowed", 400, "INVALID_MIMETYPE");
-    }
-    const attachment = await saveAttachment(db, id, file, user.id);
+    const { reference, file: uploaded } = await uploadAndReference(db, {
+      file,
+      ownerType: "item_attachment",
+      ownerId: item.id,
+      uploadedBy: user.id,
+    });
+    const view = makeAttachmentView(reference, uploaded);
 
     await audit(db, {
       actorId: user.id,
@@ -376,12 +369,12 @@ export function documentRoutes() {
       resourceType: "document",
       resourceId: id,
       resourceName: doc.title,
-      detail: { attachmentId: attachment.id, filename: file.name, size: file.size },
+      detail: { attachmentId: reference.id, filename: file.name, size: file.size },
       ...auditMeta(c),
       result: "success",
     });
 
-    return c.json({ success: true, data: attachment }, 201);
+    return c.json({ success: true, data: view }, 201);
   });
 
   router.get("/documents/:id/attachments", async (c) => {
@@ -392,7 +385,10 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     await assertAccess(db, user, doc, "viewer");
-    const data = await listAttachments(db, id);
+    const item = await resolveDocumentItem(db, id);
+    if (!item)
+      throw new NotFoundError("Document", id);
+    const data = await listAttachmentsByOwner(db, "item_attachment", item.id);
     return c.json({ success: true, data });
   });
 
@@ -405,23 +401,17 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     await assertAccess(db, user, doc, "viewer");
-    const attachment = await getAttachmentById(db, id, aid);
-    if (!attachment)
+    const item = await resolveDocumentItem(db, id);
+    if (!item)
+      throw new NotFoundError("Document", id);
+    const ref = await getReferenceById(db, aid);
+    if (!ref || ref.ownerType !== "item_attachment" || ref.ownerId !== item.id)
       throw new NotFoundError("Attachment", aid);
-
-    const file = Bun.file(attachment.filepath);
-    if (!(await file.exists())) {
+    const file = await getFileById(db, ref.fileId);
+    if (!file)
       throw new NotFoundError("File", aid);
-    }
-
-    return new Response(file.stream(), {
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(attachment.filename)}"`,
-        "Content-Length": String(attachment.size),
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    const wantInline = c.req.query("inline") === "true";
+    return await buildDownloadResponse(file, ref, { inline: wantInline });
   });
 
   router.delete("/documents/:id/attachments/:aid", async (c) => {
@@ -433,11 +423,13 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     await assertAccess(db, user, doc, "editor");
-    const attachment = await getAttachmentById(db, id, aid);
-    if (!attachment)
+    const item = await resolveDocumentItem(db, id);
+    if (!item)
+      throw new NotFoundError("Document", id);
+    const ref = await getReferenceById(db, aid);
+    if (!ref || ref.ownerType !== "item_attachment" || ref.ownerId !== item.id)
       throw new NotFoundError("Attachment", aid);
-
-    await deleteAttachment(db, attachment);
+    await releaseReference(db, { referenceId: aid });
     await audit(db, {
       actorId: user.id,
       actorName: user.name,
@@ -445,91 +437,48 @@ export function documentRoutes() {
       resourceType: "document",
       resourceId: id,
       resourceName: doc.title,
-      detail: { attachmentId: aid, filename: attachment.filename },
+      detail: { attachmentId: aid, filename: ref.filename },
       ...auditMeta(c),
       result: "success",
     });
     return c.json({ success: true, data: null });
   });
 
-  // ── Comment endpoints ──
-
-  const commentSchema = z.object({
-    content: z.string().min(1).max(10000),
+  // ── Comments + attachments (delegated to mod-item) ──
+  mountItemCommentRoutes(router, {
+    routePrefix: "/documents",
+    resourceType: "document",
+    maxCommentLength: 10000,
+    async resolve(db, idParam) {
+      const doc = await getDocumentById(db, idParam);
+      if (!doc)
+        return null;
+      const item = await resolveDocumentItem(db, idParam);
+      if (!item)
+        return null;
+      return { item, resource: doc, externalId: idParam, resourceName: doc.title };
+    },
+    async permissions(db, user, subject) {
+      const isAdmin = user.role === "admin";
+      const canView = isAdmin
+        || subject.resource.creatorId === user.id
+        || (await getDocumentPermission(db, subject.resource.id, user.id)) !== null;
+      return {
+        canRead: canView,
+        canPost: canView && !subject.resource.commentsLocked,
+        // Documents do not currently distinguish internal vs public
+        // comments. `item_comments.is_internal` defaults to `false`
+        // (set by ItemService.createComment), so passing `true` is safe
+        // and forward-compatible — the day the sub-type wants to flip
+        // some comments to internal, viewer-only callers will still be
+        // shielded if this flag is recomputed.
+        includeInternal: true,
+        canDelete: authorId => isAdmin || authorId === user.id,
+      };
+    },
   });
 
-  router.get("/documents/:id/comments", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const id = c.req.param("id");
-    const doc = await getDocumentById(db, id);
-    if (!doc)
-      throw new NotFoundError("Document", id);
-    await assertAccess(db, user, doc, "viewer");
-    const data = await listComments(db, id);
-    return c.json({ success: true, data });
-  });
-
-  router.post("/documents/:id/comments", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const id = c.req.param("id");
-    const doc = await getDocumentById(db, id);
-    if (!doc)
-      throw new NotFoundError("Document", id);
-    await assertAccess(db, user, doc, "viewer");
-
-    const body = commentSchema.parse(await c.req.json());
-    const comment = await createComment(db, { documentId: id, authorId: user.id, content: body.content });
-
-    await audit(db, {
-      actorId: user.id,
-      actorName: user.name,
-      action: "document.comment_added",
-      resourceType: "document",
-      resourceId: id,
-      resourceName: doc.title,
-      detail: { commentId: comment.id },
-      ...auditMeta(c),
-      result: "success",
-    });
-
-    return c.json({ success: true, data: comment }, 201);
-  });
-
-  router.delete("/documents/:id/comments/:cid", async (c) => {
-    const db = c.get("db");
-    const user = c.get("user")!;
-    const id = c.req.param("id");
-    const cid = c.req.param("cid");
-    const doc = await getDocumentById(db, id);
-    if (!doc)
-      throw new NotFoundError("Document", id);
-
-    const comment = await getCommentById(db, cid);
-    if (!comment)
-      throw new NotFoundError("Comment", cid);
-
-    if (user.role !== "admin" && comment.authorId !== user.id) {
-      throw new ForbiddenError();
-    }
-
-    await deleteComment(db, cid);
-    await audit(db, {
-      actorId: user.id,
-      actorName: user.name,
-      action: "document.comment_deleted",
-      resourceType: "document",
-      resourceId: id,
-      resourceName: doc.title,
-      detail: { commentId: cid },
-      ...auditMeta(c),
-      result: "success",
-    });
-    return c.json({ success: true, data: null });
-  });
-
-  // ── Share endpoints ──
+  // ── Share endpoints (policy tuples) ──
 
   const shareSchema = z.object({
     targetType: z.enum(["user", "group"]),
@@ -545,10 +494,6 @@ export function documentRoutes() {
     if (!doc)
       throw new NotFoundError("Document", id);
     assertOwnerOrAdmin(user, doc);
-    // Response includes inherited shares — each row carries `inheritedFrom`
-    // (`null` for shares on this doc, `{ id, title }` for shares applied
-    // through an ancestor). UI uses this to render inherited grants as
-    // non-removable.
     const data = await listDocumentSharesWithInheritance(db, id);
     return c.json({ success: true, data });
   });
@@ -563,7 +508,11 @@ export function documentRoutes() {
     assertOwnerOrAdmin(user, doc);
 
     const body = shareSchema.parse(await c.req.json());
-    const share = await addDocumentShare(db, { documentId: id, ...body });
+    const share = await addDocumentShare(db, {
+      documentId: id,
+      ...body,
+      createdBy: user.id,
+    });
 
     await audit(db, {
       actorId: user.id,
@@ -577,9 +526,6 @@ export function documentRoutes() {
       result: "success",
     });
 
-    // Shares cascade to descendants; the caller (and UI) should be aware
-    // that adding a grant here also grants the same access on every nested
-    // document under `:id`.
     return c.json(
       {
         success: true,

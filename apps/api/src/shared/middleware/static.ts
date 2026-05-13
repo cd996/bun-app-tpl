@@ -3,8 +3,10 @@ import { staticAssets } from "../static-assets";
 
 // Vite emits hashed filenames for JS/CSS/asset bundles (e.g. `app-d4a91f.js`,
 // `style-aa11bb.css`, fonts), which are content-addressed and safe to pin
-// for a year. Anything else (index.html, /logo.svg, /locales/*.json) must
-// revalidate so a deploy is picked up immediately.
+// for a year. Anything else (index.html, /logo.svg) must revalidate so a
+// deploy is picked up immediately. Locale JSONs now ship as hashed JS
+// chunks under `assets/` (see apps/web/src/app/i18n.ts) and are covered
+// by the same immutable rule.
 const HASHED_ASSET_RE = /\.[a-f0-9]{8,}\.(?:js|css|woff2?|ttf|otf|svg|png|jpe?g|gif|ico|webp|map)$/i;
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const REVALIDATE_CACHE = "no-cache";

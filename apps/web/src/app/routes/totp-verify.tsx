@@ -67,7 +67,7 @@ function TotpVerifyPage() {
   }, [code, t]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
       <div className="mx-auto w-full max-w-xs">
         <div className="mb-8 text-center">
           <Logo className="mx-auto size-10 mb-3" />

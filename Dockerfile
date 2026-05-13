@@ -1,3 +1,15 @@
+# Runtime base image. Declared at the top of the file (before any `FROM`)
+# so the value is a *global* build argument and the runtime stage's
+# `FROM ${RUNTIME_BASE}` can resolve it. A `ARG` declared inside a stage
+# is local to that stage and cannot be referenced by a later `FROM`.
+#
+# Public default: `debian:stable-slim` ships with glibc (matches the
+# build stage's `bun-linux-x64` target), `curl` is available for the
+# HEALTHCHECK, and the image is publicly pullable so forks can `docker
+# build` immediately without an upstream credential dance. Override via
+# `--build-arg RUNTIME_BASE=...` if you ship a custom base.
+ARG RUNTIME_BASE=debian:stable-slim
+
 # ---- Build stage ----
 FROM oven/bun:1 AS build
 WORKDIR /app
@@ -10,8 +22,14 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/tsconfig/package.json packages/tsconfig/
 RUN bun install --frozen-lockfile
 
-# Git is needed by compile.ts to embed commit hash
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# Inject the source revision so `app --version` and `/api/system/version`
+# show the actual commit. `.git` is excluded by `.dockerignore` (smaller
+# image, no leaked history), so `git rev-parse` inside the build is
+# always "unknown" — pass the hash via:
+#   docker build --build-arg BUILD_COMMIT=$(git rev-parse --short HEAD)
+# CI / release pipelines should always set this.
+ARG BUILD_COMMIT=unknown
+ENV BUILD_COMMIT=${BUILD_COMMIT}
 
 # Copy source and compile
 COPY . .
@@ -33,7 +51,16 @@ RUN set -e; \
   cp -rL "$src/node_modules/libsql" /app/_libsql/libsql
 
 # ---- Runtime stage ----
-FROM zzci/ubase
+# `RUNTIME_BASE` is declared at the top of this file as a global ARG;
+# no in-stage redeclaration is needed (and would shadow the global one).
+FROM ${RUNTIME_BASE}
+
+# `curl` for HEALTHCHECK + `ca-certificates` for outbound TLS (OIDC
+# discovery, audit egress). 0.5 MB on top of the slim base. Drop the apt
+# cache so the layer stays small.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 # Pre-create the app user + writable data dir, then drop privileges so the
 # binary never runs as root. UID 1000 keeps the bind-mounted host volume

@@ -3,6 +3,7 @@
 // unit-tested without React.
 
 import type { DocumentTreeNode } from "@/shared/lib/api/documents";
+import { storageKey } from "@/shared/lib/branding";
 
 export interface TreeIndex {
   /** Map of parentId ('' = root) → ordered children. */
@@ -155,7 +156,7 @@ export function stepFocus(
  * Reads/writes the persisted expanded-set. Keyed globally, not per-user — the
  * spec calls this out explicitly. `null` from the reader means "use default".
  */
-const STORAGE_KEY = "documents:expanded";
+const STORAGE_KEY = storageKey("documents:expanded");
 
 export function readPersistedExpansion(): ReadonlySet<string> | null {
   if (typeof window === "undefined")

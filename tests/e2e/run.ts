@@ -9,7 +9,7 @@
 //   1. dex up (OIDC fixture).
 //   2. API up — fresh, encrypted, no meta.db → status "uninitialized".
 //   3. modules/encryption/init.test.ts → init flow → status "unlocked".
-//   4. modules/{system,account,policy,document,todo,settings,audit,backup}
+//   4. modules/{system,account,policy,document,issue,settings,audit,backup}
 //      → all module tests against the unlocked API. Includes
 //      modules/system/security.test.ts (CSRF + Origin guard cases).
 //   5. API restart — sees meta.db → status "locked".
@@ -63,7 +63,7 @@ const MODULE_DIRS = [
   "account",
   "policy",
   "document",
-  "todo",
+  "issue",
   "settings",
   "audit",
   "backup",

@@ -2,6 +2,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
+import { i18nReady } from "./app/i18n";
 import { Providers } from "./app/providers";
 import { routeTree } from "./app/routeTree.gen";
 import { NotFoundPage } from "./shared/components/not-found";
@@ -27,14 +28,21 @@ const rootEl = document.getElementById("root");
 if (!rootEl)
   throw new Error("Root element #root not found");
 
-createRoot(rootEl).render(
-  <StrictMode>
-    <Providers>
-      <RouterProvider router={router} />
-      {/* Sonner toaster — global notification surface. Picks up `dark` from
-          the html class so it inherits the active theme. richColors gives
-          info / success / warning / error the standard semantic colours. */}
-      <Toaster position="top-right" richColors closeButton />
-    </Providers>
-  </StrictMode>,
-);
+// Wait for the active language's namespaces to load before the first React
+// render. Without this gate, `useTranslation` would briefly return raw keys
+// (`"auth.login"`) until the lazy locale chunks resolve — a visible flash
+// even though each namespace is only a few KB. Resolves at microtask scale
+// once the chunks are cached in the browser.
+void i18nReady.then(() => {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <Providers>
+        <RouterProvider router={router} />
+        {/* Sonner toaster — global notification surface. Picks up `dark`
+            from the html class so it inherits the active theme. richColors
+            gives info / success / warning / error the standard colours. */}
+        <Toaster position="top-right" richColors closeButton />
+      </Providers>
+    </StrictMode>,
+  );
+});

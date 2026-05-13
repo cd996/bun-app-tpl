@@ -45,7 +45,7 @@ Three sequential phases share one data dir:
 | Phase | Test target | What it covers |
 |---|---|---|
 | **A. encryption init** | `modules/encryption/init.test.ts` | API boots fresh + encrypted; status `uninitialized`; the wizard derives a master keypair from a password and POSTs `/encryption/init`; the system flips inline to `unlocked`. |
-| **B. module suites** | every `modules/<name>/*.test.ts` (excluding init/unlock) | Real-user simulation against the now-unlocked, OIDC-wired API: OAuth login, profile, users / groups CRUD, TOTP enrol + step-up, policy tuples + check + resource-groups, todos + comments + attachments, documents + folders + sharing + attachments, settings, audit, backup export with DEK proof, encryption admin (challenge / meta / change-master). |
+| **B. module suites** | every `modules/<name>/*.test.ts` (excluding init/unlock) | Real-user simulation against the now-unlocked, OIDC-wired API: OAuth login, profile, users / groups CRUD, TOTP enrol + step-up, policy tuples + check + resource-groups, issues + comments + attachments, documents + folders + sharing + attachments, settings, audit, backup export with DEK proof, encryption admin (challenge / meta / change-master). |
 | **C. encryption unlock** | `modules/encryption/unlock.test.ts` | API restart with the same DB → `locked`; the wizard fetches the unlock-challenge bundle, re-derives the master key, decrypts the wrapped DEK, re-encrypts under the server's ephemeral pubkey, POSTs `/encryption/unlock` → `unlocked` again. |
 
 dex itself is fetched on first run (binary extracted from the official
@@ -76,8 +76,8 @@ tests/e2e/
     document/
       documents.test.ts        # folders + documents + sharing
       attachments.test.ts      # multipart upload + download + delete
-    todo/
-      todos.test.ts            # CRUD + comments
+    issue/
+      issues.test.ts           # CRUD + comments
       attachments.test.ts      # multipart upload + size cap
     settings/
       settings.test.ts         # admin K/V + 403 matrix

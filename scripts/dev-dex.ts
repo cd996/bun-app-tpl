@@ -76,7 +76,7 @@ const ACCESS_URL = cli["access-url"] ?? process.env.ACCESS_URL ?? APP_URL_DEFAUL
 const DEX_ISSUER = cli.issuer ?? process.env.OAUTH_ISSUER ?? DEX_URL_DEFAULT;
 const OAUTH_CLIENT_ID = cli["client-id"] ?? process.env.OAUTH_CLIENT_ID ?? APP_NAME;
 const OAUTH_CLIENT_SECRET = cli["client-secret"] ?? process.env.OAUTH_CLIENT_SECRET ?? `${APP_NAME}-secret`;
-const DEFAULT_ADMIN = cli.admin ?? process.env.DEFAULT_ADMIN ?? "admin@zzci.cc";
+const DEFAULT_ADMIN = cli.admin ?? process.env.DEFAULT_ADMIN ?? "admin@example.com";
 
 if (!existsSync(DEX_BIN)) {
   console.log("[dev-dex] installing dex binary…");
@@ -114,13 +114,17 @@ staticClients:
     name: ${APP_NAME} dev
 enablePasswordDB: true
 staticPasswords:
-  # bcrypt of "zzci" — local dev only.
+  # bcrypt hash of "admin" — local dev only, matches the e2e fixture so
+  # the same admin@example.com / admin credential works in both
+  # "bun run dev" and "bun run test:e2e". Operators who do not want a
+  # publicly-known password rotate staticPasswords here, or point
+  # OAUTH_ISSUER at a real IdP and skip dev:dex entirely.
   - email: ${DEFAULT_ADMIN}
-    hash: "$2b$10$M9wq9thkL.h9qhogWR.aJu.omMVRSgmoWxyXZEO841elWrp9p0yj2"
+    hash: "$2b$10$UrL8u9yDL7isi7fFZnKwJuT3tWh3zIs3jlbEK4glmIK/zZZqNNBcO"
     username: admin
     userID: dev-admin
-  - email: user@zzci.cc
-    hash: "$2b$10$M9wq9thkL.h9qhogWR.aJu.omMVRSgmoWxyXZEO841elWrp9p0yj2"
+  - email: user@example.com
+    hash: "$2b$10$UrL8u9yDL7isi7fFZnKwJuT3tWh3zIs3jlbEK4glmIK/zZZqNNBcO"
     username: user
     userID: dev-user
 `;
@@ -164,7 +168,7 @@ if (!dexReady) {
   dex.kill();
   process.exit(1);
 }
-console.log(`[dev-dex] dex ready · login: ${DEFAULT_ADMIN} / zzci`);
+console.log(`[dev-dex] dex ready · login: ${DEFAULT_ADMIN} / admin`);
 console.log("[dev-dex] expected .env (matching values):");
 console.log(`            OAUTH_ISSUER=${DEX_ISSUER}`);
 console.log(`            OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}`);

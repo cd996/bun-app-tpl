@@ -1,8 +1,7 @@
 import type { Config } from "@/config";
 import type { AppDatabase } from "@/db";
 import { sum } from "drizzle-orm";
-import { documentAttachments } from "@/modules/document/schema";
-import { todoAttachments } from "@/modules/todo/schema";
+import { files } from "@/modules/file/schema";
 import { AppError } from "@/shared/lib/errors";
 
 /**
@@ -86,10 +85,10 @@ export function isWithinFileSize(size: number): boolean {
   return size > 0 && size <= limits.maxUploadBytes;
 }
 
+/** Total bytes accounted for by every stored blob. */
 async function recomputeUsedFromDb(db: AppDatabase): Promise<number> {
-  const docRow = await db.select({ value: sum(documentAttachments.size) }).from(documentAttachments).get();
-  const todoRow = await db.select({ value: sum(todoAttachments.size) }).from(todoAttachments).get();
-  return Number(docRow?.value ?? 0) + Number(todoRow?.value ?? 0);
+  const fileRow = await db.select({ value: sum(files.size) }).from(files).get();
+  return Number(fileRow?.value ?? 0);
 }
 
 /**

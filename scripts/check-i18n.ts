@@ -12,7 +12,7 @@ import { resolve } from "node:path";
 import process from "node:process";
 
 const ROOT = resolve(import.meta.dir, "..");
-const LOCALES_DIR = resolve(ROOT, "apps/web/public/locales");
+const LOCALES_DIR = resolve(ROOT, "apps/web/src/locales");
 
 function flattenKeys(value: unknown, prefix = ""): string[] {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {

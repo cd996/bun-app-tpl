@@ -47,6 +47,54 @@ const defaultNamespaces: readonly NamespaceConfig[] = [
       member: { union: [{ this: {} }] },
     },
   },
+  // `item` is the permission namespace for the item base module
+  // (`apps/api/src/modules/item/`). Every sub-type that builds on `item`
+  // (issue, document, …) writes its access tuples here.
+  //
+  // Relations:
+  // - owner    : creator; full control. Written by ItemService.createItem.
+  // - editor   : can modify; implied by owner.
+  // - viewer   : can read; implied by editor. Also inherited from any
+  //              ancestor `item` reached via the parent_item edge — this is
+  //              how document subtree visibility works (a viewer/editor on a
+  //              parent item flows down to its descendants).
+  // - assignee : current handler (issue assignee); implied by owner. The
+  //              relation is here so sub-types can list "items assigned to
+  //              me" without each rolling its own indexed column.
+  // - approver : current approver in an approval flow (e.g. expense).
+  //              Stays narrow (no implicit inheritance) so revoking it on
+  //              status transitions is straightforward.
+  // - watcher  : notification-only subscriber. No visibility implications;
+  //              sub-types decide whether watching also grants read.
+  // - parent_item : item → item edge. Only the upward edge is stored
+  //                 (`(item, child, parent_item, item, parent)`); the
+  //                 downward enumeration is a recursive CTE on tuples.
+  {
+    name: "item",
+    relations: {
+      owner: { union: [{ this: {} }] },
+      editor: {
+        union: [
+          { this: {} },
+          { computed_userset: { relation: "owner" } },
+          { tuple_to_userset: { tupleset: "parent_item", computed_userset: "editor" } },
+        ],
+      },
+      viewer: {
+        union: [
+          { this: {} },
+          { computed_userset: { relation: "editor" } },
+          { tuple_to_userset: { tupleset: "parent_item", computed_userset: "viewer" } },
+        ],
+      },
+      assignee: {
+        union: [{ this: {} }, { computed_userset: { relation: "owner" } }],
+      },
+      approver: { union: [{ this: {} }] },
+      watcher: { union: [{ this: {} }] },
+      parent_item: { union: [{ this: {} }] },
+    },
+  },
 ];
 
 export function loadNamespaces(configs?: readonly NamespaceConfig[]): void {
